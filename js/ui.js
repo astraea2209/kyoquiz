@@ -15,12 +15,17 @@ const DIFFICULTY_LABEL = {
   [DIFFICULTY.EASY]: '쉬움',
   [DIFFICULTY.NORMAL]: '보통',
   [DIFFICULTY.HARD]: '어려움',
+  [DIFFICULTY.EXTREME]: '매우 어려움',
 };
 const DIFFICULTY_HINT = {
   [DIFFICULTY.EASY]: '4지선다 객관식으로 곡 제목을 고릅니다.',
   [DIFFICULTY.NORMAL]: '곡 제목 또는 작품명(별칭 포함)을 입력하면 정답입니다.',
   [DIFFICULTY.HARD]: '곡 제목(별칭 포함)만 정답으로 인정합니다.',
+  [DIFFICULTY.EXTREME]: `제목·가수·작품명을 모두 맞혀야 라운드가 끝납니다. 맞힌 항목마다 점수, 전부 맞히면 보너스. 오답 기회 ${SCORING.extreme.maxWrongAttempts}번.`,
 };
+const ITEM_LABEL = { title: '제목', artist: '가수', anime: '작품명' };
+const itemValue = (song, key) => ({ title: song.title, artist: song.artist, anime: song.anime?.name })[key] ?? '';
+const itemNames = (keys) => keys.map((key) => ITEM_LABEL[key]).join(', ');
 const RESULT_TEXT = {
   correct: (p) => `정답! +${p}점`,
   wrong: () => '오답 3회 — 0점',
@@ -53,6 +58,8 @@ export class App {
     this.lastSettings = null;
     this.renderedRound = null;
     this.resultShown = false;
+    this.answerWasReady = false;
+    this.revealWasShown = false;
   }
 
   init() {
@@ -179,7 +186,10 @@ export class App {
   // ---------- 게임 화면 ----------
   bindGame() {
     $('#play-btn').addEventListener('click', () => this.game?.playCurrent());
-    $('#replay-btn').addEventListener('click', () => this.game?.replay());
+    $('#replay-btn').addEventListener('click', () => {
+      // 다시듣기를 눌러도 바로 이어서 입력할 수 있게 입력칸으로 돌아간다
+      if (this.game?.replay()) this.focusAnswer();
+    });
     $('#pass-btn').addEventListener('click', () => this.game?.pass());
     $('#next-btn').addEventListener('click', () => this.game?.next());
     $('#quit-btn').addEventListener('click', () => {
@@ -196,18 +206,61 @@ export class App {
       const result = this.game?.submitAnswer(input.value);
       if (!result) return;
       this.showAnswerFeedback(result);
-      if (!result.correct) input.select();
+      if (result.correct) input.value = '';
+      else input.select();
     });
+  }
+
+  /** 답 입력칸에 포커스(매 라운드 입력칸을 다시 클릭하지 않아도 되게) */
+  focusAnswer() {
+    const input = $('#answer-input');
+    if (this.screen !== 'game' || input.disabled || $('#answer-form').hidden) return;
+    const active = document.activeElement;
+    if (active === input || active?.matches?.('[data-volume]')) return; // 볼륨 조절 중에는 뺏지 않는다
+    input.focus();
   }
 
   showAnswerFeedback(result) {
     const fb = $('#feedback');
     if (result.correct) {
-      fb.textContent = '';
+      // 매우 어려움에서 일부 항목만 맞힌 경우
+      const round = this.game?.round;
+      if (result.items && !result.complete && round) {
+        const left = round.items.filter((key) => !round.solved.has(key));
+        fb.className = 'feedback ok';
+        fb.textContent = `${itemNames(result.items)} 정답! +${result.points}점 · 남은 항목: ${itemNames(left)}`;
+      } else {
+        fb.textContent = '';
+      }
+      return;
+    }
+    if (result.already) {
+      fb.className = 'feedback';
+      fb.textContent = `이미 맞힌 항목이에요(${itemNames(result.already)}). 기회는 줄지 않아요.`;
       return;
     }
     fb.className = 'feedback bad';
     fb.textContent = result.revealed ? '기회를 모두 썼습니다.' : `틀렸어요. 남은 기회 ${result.attemptsLeft}번`;
+  }
+
+  /** 매우 어려움 항목 칸: 맞힌 항목은 답과 점수, 못 맞힌 항목은 ?(공개 후에는 정답) */
+  renderExtremeItems(round, revealed) {
+    const list = $('#extreme-items');
+    list.hidden = !round.items;
+    if (!round.items) return;
+    list.replaceChildren(
+      ...round.items.map((key) => {
+        const solved = round.solved.get(key);
+        const state = solved ? 'solved' : revealed ? 'missed' : '';
+        return el(
+          'li',
+          { class: state },
+          el('span', { class: 'item-label', text: ITEM_LABEL[key] }),
+          el('span', { class: 'item-value', text: solved || revealed ? itemValue(round.song, key) : '?' }),
+          ...(solved ? [el('span', { class: 'item-points', text: `+${solved.points}` })] : []),
+        );
+      }),
+    );
   }
 
   renderGame() {
@@ -226,6 +279,8 @@ export class App {
       $('#feedback').textContent = '';
       $('#feedback').className = 'feedback';
       this.buildChoices();
+      this.answerWasReady = false;
+      this.revealWasShown = false;
     }
 
     const { phase } = game;
@@ -277,31 +332,50 @@ export class App {
     $('#choices').hidden = !easy;
     $('#answer-form').hidden = easy;
     const left = game.attemptsLeft;
-    $('#attempts').textContent = `남은 기회 ${'●'.repeat(left)}${'○'.repeat(SCORING.maxWrongAttempts - left)}`;
+    $('#attempts').textContent = `남은 기회 ${'●'.repeat(left)}${'○'.repeat(game.maxWrongAttempts - left)}`;
     const input = $('#answer-input');
-    input.disabled = !game.canAnswer;
-    $('#answer-form button').disabled = !game.canAnswer;
-    input.placeholder = game.difficulty === DIFFICULTY.HARD ? '곡 제목' : '곡 제목 또는 작품명';
+    const canAnswer = game.canAnswer;
+    input.disabled = !canAnswer;
+    $('#answer-form button').disabled = !canAnswer;
+    input.placeholder = {
+      [DIFFICULTY.HARD]: '곡 제목',
+      [DIFFICULTY.EXTREME]: '제목, 가수, 작품명 중 하나씩 입력',
+    }[game.difficulty] ?? '곡 제목 또는 작품명';
+    this.renderExtremeItems(round, revealed);
     for (const [i, btn] of $$('#choices .btn').entries()) {
       const wrong = round.disabledChoices.has(i);
       btn.classList.toggle('wrong', wrong);
       btn.disabled = wrong || !game.canAnswer;
     }
+    // 소리가 나기 시작해 답할 수 있게 되는 순간 입력칸에 자동 포커스
+    if (canAnswer && !this.answerWasReady) this.focusAnswer();
+    this.answerWasReady = canAnswer;
 
     // 정답 공개
     $('#reveal').hidden = !revealed;
     if (revealed && round.result) {
       const { reason, points } = round.result;
       const resultEl = $('#reveal-result');
-      resultEl.textContent = RESULT_TEXT[reason](points);
-      resultEl.className = `reveal-result ${reason === 'correct' ? 'ok' : 'bad'}`;
+      resultEl.textContent = this.revealText(round.result);
+      resultEl.className = `reveal-result ${reason === 'correct' || points > 0 ? 'ok' : 'bad'}`;
       $('#reveal-title').replaceChildren(
         round.song.title,
         ...(round.song.artist ? [el('span', { class: 'reveal-artist', text: ` / ${round.song.artist}` })] : []),
       );
       $('#reveal-anime').textContent = [round.song.anime?.name, round.song.type].filter(Boolean).join(' · ');
       $('#next-btn').textContent = game.hasNext ? '다음 곡' : '결과 보기';
+      // 공개되면 Enter로 바로 다음 곡으로 넘어갈 수 있게
+      if (!this.revealWasShown) $('#next-btn').focus();
     }
+    this.revealWasShown = revealed;
+  }
+
+  revealText(result) {
+    const { reason, points, items, solved, bonus } = result;
+    if (!items) return RESULT_TEXT[reason](points);
+    if (reason === 'correct') return `전부 정답! +${points}점 (보너스 ${bonus}점 포함)`;
+    const why = { wrong: '기회 소진', pass: '패스', timeout: '시간 초과' }[reason];
+    return `${solved.length}/${items.length} 맞힘 — +${points}점 (${why})`;
   }
 
   buildChoices() {
@@ -362,15 +436,17 @@ export class App {
 
     const list = $('#result-list');
     list.replaceChildren(
-      ...game.history.map((h) =>
-        el(
+      ...game.history.map((h) => {
+        const partial = !h.correct && h.solved?.length > 0;
+        return el(
           'li',
           {},
           el('span', { class: 'pts', text: `${h.points}점` }),
-          el('span', { class: h.correct ? 'ok' : 'bad', text: h.correct ? '○ ' : '× ' }),
+          el('span', { class: h.correct || partial ? 'ok' : 'bad', text: h.correct ? '○ ' : partial ? '△ ' : '× ' }),
           [h.song.title, h.song.anime?.name ?? h.song.artist].filter(Boolean).join(' — '),
-        ),
-      ),
+          ...(h.items ? [` (${h.solved.length}/${h.items.length})`] : []),
+        );
+      }),
     );
     this.showScreen('result');
   }

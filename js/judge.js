@@ -1,6 +1,9 @@
 // 정답 판정: 정규화, 오타 허용, 난이도별 후보, 객관식 보기 생성.
 
-export const DIFFICULTY = Object.freeze({ EASY: 'easy', NORMAL: 'normal', HARD: 'hard' });
+export const DIFFICULTY = Object.freeze({ EASY: 'easy', NORMAL: 'normal', HARD: 'hard', EXTREME: 'extreme' });
+
+/** 매우 어려움에서 맞혀야 하는 항목(표시 순서) */
+export const EXTREME_ITEMS = Object.freeze(['title', 'artist', 'anime']);
 
 /** NFKC → 소문자 → 문자/숫자/결합문자 외 모두 제거 */
 export function normalizeAnswer(text) {
@@ -51,6 +54,40 @@ export function answerCandidates(song, difficulty) {
   if (difficulty === DIFFICULTY.HARD) return titles.filter(Boolean);
   const anime = song.anime ?? {};
   return [...titles, anime.name, ...(anime.aliases ?? [])].filter(Boolean);
+}
+
+/**
+ * 매우 어려움 항목별 정답 후보. 곡에 없는 항목(가수 없음, 작품 없는 일반 노래)은 빠진다.
+ * @returns {Record<string, string[]>} EXTREME_ITEMS 순서
+ */
+export function itemCandidates(song) {
+  const lists = {
+    title: [song.title, ...(song.titleAliases ?? [])],
+    artist: [song.artist, ...(song.artistAliases ?? [])],
+    anime: [song.anime?.name, ...(song.anime?.aliases ?? [])],
+  };
+  const result = {};
+  for (const key of EXTREME_ITEMS) {
+    const list = lists[key].filter((v) => typeof v === 'string' && v.trim());
+    if (String(lists[key][0] ?? '').trim()) result[key] = list;
+  }
+  return result;
+}
+
+/**
+ * 매우 어려움 판정: 입력 하나를 아직 못 맞힌 모든 항목과 비교한다.
+ * @param {Iterable<string>} solved 이미 맞힌 항목
+ * @returns {{matched: string[], already: string[]}} matched: 새로 맞힌 항목, already: 이미 맞힌 항목과만 일치
+ */
+export function judgeItems(input, song, solved = []) {
+  const done = new Set(solved);
+  const matched = [];
+  const already = [];
+  for (const [key, candidates] of Object.entries(itemCandidates(song))) {
+    if (!candidates.some((c) => matchesCandidate(input, c))) continue;
+    (done.has(key) ? already : matched).push(key);
+  }
+  return { matched, already };
 }
 
 /** 주관식 판정 */

@@ -6,7 +6,9 @@ import {
   buildChoices,
   canUseMultipleChoice,
   editDistance,
+  itemCandidates,
   judgeAnswer,
+  judgeItems,
   matchesCandidate,
   normalizeAnswer,
 } from '../js/judge.js';
@@ -106,4 +108,28 @@ test('judgeAnswer: 작품명이 없는 일반 노래는 보통 난이도에서�
   assert.equal(judgeAnswer('bam yang gang', song, DIFFICULTY.NORMAL).correct, true);
   assert.equal(judgeAnswer('비비', song, DIFFICULTY.NORMAL).correct, false);
   assert.equal(judgeAnswer('밤양갱', song, DIFFICULTY.HARD).correct, true);
+});
+
+test('매우 어려움 항목 후보: 곡에 있는 항목만, 표시 순서는 제목·가수·작품명', () => {
+  const song = makeSong(1, { artist: '가수 이름', artistAliases: ['Singer Name'] });
+  assert.deepEqual(itemCandidates(song), {
+    title: ['Song Title 1', '별칭1'],
+    artist: ['가수 이름', 'Singer Name'],
+    anime: ['Anime Work 1', '작품1'],
+  });
+  const plain = makeSong(2, { artist: '가수', anime: undefined });
+  assert.deepEqual(Object.keys(itemCandidates(plain)), ['title', 'artist']);
+  const noArtist = makeSong(3, { artist: '  ', artistAliases: ['별칭만'] });
+  assert.deepEqual(Object.keys(itemCandidates(noArtist)), ['title', 'anime']); // 가수 이름이 없으면 별칭만으로는 항목을 만들지 않는다
+});
+
+test('매우 어려움 판정: 입력 하나를 남은 모든 항목과 비교', () => {
+  const song = makeSong(1, { artist: 'Singer Name' });
+  assert.deepEqual(judgeItems('singer nme', song), { matched: ['artist'], already: [] }); // 오타 허용
+  assert.deepEqual(judgeItems('작품1', song), { matched: ['anime'], already: [] });
+  assert.deepEqual(judgeItems('별칭1', song, ['title']), { matched: [], already: ['title'] });
+  assert.deepEqual(judgeItems('전혀 다른 답', song), { matched: [], already: [] });
+  // 제목과 작품명이 같으면 한 번에 둘 다 맞힌다
+  const same = makeSong(2, { title: 'Same Name', anime: { name: 'Same Name', aliases: [] }, artist: 'X Band' });
+  assert.deepEqual(judgeItems('same name', same), { matched: ['title', 'anime'], already: [] });
 });

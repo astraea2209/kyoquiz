@@ -6,8 +6,8 @@
 //   onStateChange(cb(state)) → 구독 해제 함수,  onError(cb(code)) → 구독 해제 함수
 // state 값은 PLAYER_STATE 참고.
 
-import { DIFFICULTY, buildChoices, canUseMultipleChoice, judgeAnswer, shuffle } from './judge.js';
-import { SCORING, scoreFull, scoreRandom } from './scoring.js';
+import { DIFFICULTY, buildChoices, canUseMultipleChoice, itemCandidates, judgeAnswer, judgeItems, shuffle } from './judge.js';
+import { SCORING, scoreExtremeBonus, scoreExtremeItem, scoreFull, scoreRandom } from './scoring.js';
 import { pickSegmentStart } from './segment.js';
 
 export const MODE = Object.freeze({ RANDOM: 'random', FULL: 'full' });
@@ -126,6 +126,13 @@ export class GameSession {
   get isRandom() {
     return this.settings.mode === MODE.RANDOM;
   }
+  get isExtreme() {
+    return this.difficulty === DIFFICULTY.EXTREME;
+  }
+  /** 라운드당 오답 기회(매우 어려움은 항목이 많아 더 준다) */
+  get maxWrongAttempts() {
+    return this.isExtreme ? SCORING.extreme.maxWrongAttempts : SCORING.maxWrongAttempts;
+  }
 
   // ---------- 게임 진행 ----------
   /** 시작 버튼 클릭 핸들러 안에서 호출해야 첫 곡 재생이 자동재생 차단에 걸리지 않는다. */
@@ -164,6 +171,11 @@ export class GameSession {
       choices: this.difficulty === DIFFICULTY.EASY ? buildChoices(song, this.allSongs, this.rng) : null,
       disabledChoices: new Set(),
       wrongAnswers: [],
+      // 매우 어려움: 맞혀야 할 항목과 맞힌 항목(key → {points, elapsed})
+      items: this.isExtreme ? Object.keys(itemCandidates(song)) : null,
+      solved: new Map(),
+      itemPoints: 0,
+      bonus: 0,
       result: null,
       heard: false,
       stage: null, // 'probe' | 'seek' | 'audible'
@@ -263,19 +275,59 @@ export class GameSession {
   }
 
   get attemptsLeft() {
-    return this.round ? SCORING.maxWrongAttempts - this.round.wrongCount : 0;
+    return this.round ? this.maxWrongAttempts - this.round.wrongCount : 0;
   }
 
   /** 주관식 답 제출 */
   submitAnswer(text) {
     if (!this.canAnswer || this.difficulty === DIFFICULTY.EASY) return null;
     if (!String(text ?? '').trim()) return null;
+    if (this.isExtreme) return this.submitExtreme(text);
     const { correct } = judgeAnswer(text, this.round.song, this.difficulty);
     if (correct) {
       this.reveal('correct');
       return { correct: true };
     }
     this.round.wrongAnswers.push(String(text));
+    return this.registerWrong();
+  }
+
+  /** 지금 맞히면 받을 라운드 기본 점수(랜덤: 구간·다시듣기, 전체: 경과 시간) */
+  currentBase() {
+    return this.isRandom
+      ? scoreRandom({ clipLength: this.settings.clipLength, replayUsed: this.round.replayUsed })
+      : scoreFull({ elapsed: this.audibleElapsed(), timeLimit: this.settings.timeLimit });
+  }
+
+  /**
+   * 매우 어려움: 입력이 맞힌 항목마다 바로 점수를 준다. 전부 맞히면 보너스와 함께 공개.
+   * 이미 맞힌 항목만 다시 입력하면 오답으로 치지 않는다.
+   */
+  submitExtreme(text) {
+    const round = this.round;
+    const { matched, already } = judgeItems(text, round.song, round.solved.keys());
+    if (matched.length) {
+      const base = this.currentBase();
+      const elapsed = this.isRandom ? null : this.audibleElapsed();
+      let gained = 0;
+      for (const item of matched) {
+        const points = scoreExtremeItem({ base, item, items: round.items });
+        round.solved.set(item, { points, elapsed });
+        gained += points;
+      }
+      const complete = round.items.every((key) => round.solved.has(key));
+      if (complete) {
+        round.bonus = scoreExtremeBonus(base);
+        gained += round.bonus;
+      }
+      round.itemPoints += gained;
+      this.score += gained;
+      if (complete) this.reveal('correct');
+      else this.changed();
+      return { correct: true, items: matched, points: gained, bonus: round.bonus, complete };
+    }
+    if (already.length) return { correct: false, already, attemptsLeft: this.attemptsLeft, revealed: false };
+    round.wrongAnswers.push(String(text));
     return this.registerWrong();
   }
 
@@ -295,7 +347,7 @@ export class GameSession {
 
   registerWrong() {
     this.round.wrongCount++;
-    if (this.round.wrongCount >= SCORING.maxWrongAttempts) {
+    if (this.round.wrongCount >= this.maxWrongAttempts) {
       this.reveal('wrong');
       return { correct: false, attemptsLeft: 0, revealed: true };
     }
@@ -330,10 +382,11 @@ export class GameSession {
     this.pauseAudio();
     this.stopPolling();
     let points = 0;
-    if (reason === 'correct') {
-      points = this.isRandom
-        ? scoreRandom({ clipLength: this.settings.clipLength, replayUsed: round.replayUsed })
-        : scoreFull({ elapsed: this.audibleElapsed(), timeLimit: this.settings.timeLimit });
+    if (this.isExtreme) {
+      points = round.itemPoints; // 항목을 맞힐 때마다 이미 점수에 더했다
+    } else if (reason === 'correct') {
+      points = this.currentBase();
+      this.score += points;
     }
     round.result = {
       reason,
@@ -341,7 +394,11 @@ export class GameSession {
       points,
       elapsed: this.isRandom ? null : this.audibleElapsed(),
     };
-    this.score += points;
+    if (this.isExtreme) {
+      round.result.items = round.items.slice();
+      round.result.solved = round.items.filter((key) => round.solved.has(key));
+      round.result.bonus = round.bonus;
+    }
     this.history.push({ song: round.song, ...round.result });
     const wasPlaying = this.phase !== PHASE.READY;
     this.phase = PHASE.REVEALED;

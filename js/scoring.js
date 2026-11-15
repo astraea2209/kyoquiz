@@ -20,6 +20,13 @@ export const SCORING = Object.freeze({
     minPlayers: 2,
     maxPlayers: 8,
   }),
+  // 매우 어려움(제목·가수·작품명 모두 맞히기). 라운드 기본 점수(랜덤·전체듣기 공식)를 항목 가중치대로 나눠 주고,
+  // 전부 맞히면 기본 점수의 completeBonus만큼 더 준다. 곡에 없는 항목은 빼고 나머지 가중치로 나눈다.
+  extreme: Object.freeze({
+    itemWeights: Object.freeze({ title: 2, artist: 1, anime: 1 }),
+    completeBonus: 0.5,
+    maxWrongAttempts: 5,
+  }),
   maxWrongAttempts: 3,
   replaysPerRound: 1,
   clipLengths: Object.freeze([3, 5, 10]),
@@ -39,6 +46,23 @@ export function scoreFull({ elapsed, timeLimit = SCORING.full.timeLimit }) {
   const cfg = SCORING.full;
   const t = Math.min(Math.max(0, elapsed), timeLimit);
   return Math.round(cfg.max - (cfg.decay * t) / timeLimit);
+}
+
+/**
+ * 매우 어려움 항목 점수.
+ * @param {number} base 맞힌 시점의 라운드 기본 점수(scoreRandom 또는 scoreFull)
+ * @param {string} item 맞힌 항목
+ * @param {string[]} items 이 곡에 있는 항목들
+ */
+export function scoreExtremeItem({ base, item, items }, cfg = SCORING.extreme) {
+  const total = items.reduce((sum, key) => sum + (cfg.itemWeights[key] ?? 0), 0);
+  if (!total) return 0;
+  return Math.round((base * (cfg.itemWeights[item] ?? 0)) / total);
+}
+
+/** 매우 어려움에서 모든 항목을 맞혔을 때 보너스 */
+export function scoreExtremeBonus(base, cfg = SCORING.extreme) {
+  return Math.round(base * cfg.completeBonus);
 }
 
 /**

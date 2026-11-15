@@ -78,7 +78,7 @@ test('설정: 방장만, 값 검증, 부분 변경', () => {
   assert.equal(env.state().settings.mode, 'full');
   assert.equal(env.state().settings.rounds, 5);
 
-  for (const bad of [{ rounds: 7 }, { clipLength: 4 }, { answerTime: 12 }, { mode: 'x' }, { difficulty: 'insane' }]) {
+  for (const bad of [{ rounds: 7 }, { clipLength: 4 }, { answerTime: 12 }, { mode: 'x' }, { difficulty: 'insane' }, { difficulty: 'extreme' }]) {
     env.send('a', { type: 'settings', settings: bad });
     assert.equal(env.last('a', 'error').code, 'bad-settings');
   }

@@ -410,3 +410,100 @@ test('dispose 후에는 플레이어 이벤트를 받지 않는다', () => {
   assert.equal(game.phase, PHASE.LOADING);
   assert.equal(players[0].stateHandlers.size, 0);
 });
+
+function extremeSongs(count = 5) {
+  return Array.from({ length: count }, (_, i) =>
+    makeSong(i + 1, { duration: 200, artist: `Singer Name ${i + 1}`, artistAliases: [`가수${i + 1}`] }),
+  );
+}
+
+test('매우 어려움: 항목마다 점수, 셋 다 맞혀야 공개되고 보너스', () => {
+  const { game } = setup({ songs: extremeSongs(), settings: { difficulty: DIFFICULTY.EXTREME } });
+  game.start();
+  beginAudio(game);
+  const song = game.round.song;
+  assert.deepEqual(game.round.items, ['title', 'artist', 'anime']);
+
+  const r1 = game.submitAnswer(song.artistAliases[0]);
+  assert.deepEqual(r1, { correct: true, items: ['artist'], points: 25, bonus: 0, complete: false });
+  assert.equal(game.score, 25); // 맞힌 즉시 점수에 반영
+  assert.equal(game.phase, PHASE.PLAYING); // 다 맞히기 전에는 라운드가 끝나지 않음
+
+  // 이미 맞힌 항목은 오답으로 치지 않는다
+  const again = game.submitAnswer(song.artist);
+  assert.deepEqual(again, { correct: false, already: ['artist'], attemptsLeft: 5, revealed: false });
+
+  assert.equal(game.submitAnswer(song.anime.name).points, 25);
+  const last = game.submitAnswer(song.title);
+  assert.deepEqual(last, { correct: true, items: ['title'], points: 100, bonus: 50, complete: true }); // 제목 50 + 보너스 50
+  assert.equal(game.phase, PHASE.REVEALED);
+  assert.equal(game.score, 150);
+  assert.equal(game.round.result.points, 150);
+  assert.equal(game.round.result.correct, true);
+  assert.deepEqual(game.round.result.solved, ['title', 'artist', 'anime']);
+  assert.equal(game.history[0].points, 150);
+});
+
+test('매우 어려움: 일부만 맞히고 패스해도 맞힌 항목 점수는 남는다', () => {
+  const { game } = setup({ songs: extremeSongs(), settings: { difficulty: DIFFICULTY.EXTREME } });
+  game.start();
+  beginAudio(game);
+  game.submitAnswer(game.round.song.title);
+  game.pass();
+  assert.equal(game.phase, PHASE.REVEALED);
+  assert.deepEqual(
+    { reason: game.round.result.reason, correct: game.round.result.correct, points: game.round.result.points },
+    { reason: 'pass', correct: false, points: 50 },
+  );
+  assert.deepEqual(game.round.result.solved, ['title']);
+  assert.equal(game.score, 50); // 두 번 더하지 않는다
+});
+
+test('매우 어려움: 오답 기회 5번, 소진하면 맞힌 항목 점수만 두고 공개', () => {
+  const { game } = setup({ songs: extremeSongs(), settings: { difficulty: DIFFICULTY.EXTREME } });
+  game.start();
+  beginAudio(game);
+  assert.equal(game.attemptsLeft, 5);
+  game.submitAnswer(game.round.song.anime.aliases[0]);
+  for (let i = 0; i < 4; i++) assert.equal(game.submitAnswer(`틀린 답 ${i}`).revealed, false);
+  assert.deepEqual(game.submitAnswer('틀린 답 마지막'), { correct: false, attemptsLeft: 0, revealed: true });
+  assert.equal(game.round.result.reason, 'wrong');
+  assert.equal(game.round.result.points, 25);
+  assert.equal(game.score, 25);
+});
+
+test('매우 어려움: 작품이 없는 곡은 제목·가수만 맞히면 끝', () => {
+  const songs = extremeSongs().map((s) => ({ ...s, anime: undefined, type: '일반곡' }));
+  const { game } = setup({ songs, settings: { difficulty: DIFFICULTY.EXTREME } });
+  game.start();
+  beginAudio(game);
+  assert.deepEqual(game.round.items, ['title', 'artist']);
+  assert.equal(game.submitAnswer(game.round.song.title).points, 67);
+  assert.equal(game.submitAnswer(game.round.song.artist).points, 83); // 33 + 보너스 50
+  assert.equal(game.phase, PHASE.REVEALED);
+  assert.equal(game.score, 150);
+});
+
+test('매우 어려움 전체듣기: 항목마다 맞힌 시점의 점수', () => {
+  const { game, clock } = setup({ songs: extremeSongs(), settings: { mode: MODE.FULL, difficulty: DIFFICULTY.EXTREME } });
+  game.start();
+  beginAudio(game);
+  game.submitAnswer(game.round.song.title); // 0초: 기본 100 → 50
+  clock.advance(15000);
+  game.tick();
+  game.submitAnswer(game.round.song.artist); // 15초: 기본 60 → 15
+  assert.equal(game.score, 65);
+  clock.advance(15000);
+  game.tick(); // 30초 → 시간 초과
+  assert.equal(game.phase, PHASE.REVEALED);
+  assert.equal(game.round.result.reason, 'timeout');
+  assert.equal(game.round.result.points, 65);
+  assert.deepEqual(game.round.result.solved, ['title', 'artist']);
+});
+
+test('매우 어려움이 아닌 난이도는 오답 기회 3번 그대로', () => {
+  const { game } = setup();
+  game.start();
+  assert.equal(game.maxWrongAttempts, 3);
+  assert.equal(game.round.items, null);
+});

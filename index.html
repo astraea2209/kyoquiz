@@ -56,6 +56,7 @@
           <label><input type="radio" name="difficulty" value="easy" /><span>쉬움</span></label>
           <label><input type="radio" name="difficulty" value="normal" checked /><span>보통</span></label>
           <label><input type="radio" name="difficulty" value="hard" /><span>어려움</span></label>
+          <label><input type="radio" name="difficulty" value="extreme" /><span>매우 어려움</span></label>
         </fieldset>
         <p class="hint" id="difficulty-hint"></p>
         <div class="volume-row">
@@ -112,6 +113,8 @@
         <button type="button" class="btn ghost" id="pass-btn">패스</button>
       </div>
 
+      <!-- 매우 어려움: 항목별 맞힘 상태. 정답 공개 중에도 보여 준다 -->
+      <ul class="extreme-items" id="extreme-items" aria-label="맞힌 항목" hidden></ul>
       <div id="answer-area">
         <p class="attempts" id="attempts"></p>
         <div class="choices" id="choices"></div>

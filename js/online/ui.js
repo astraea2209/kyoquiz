@@ -539,6 +539,7 @@ export class OnlineApp {
       this.renderedRoundId = round.roundId;
       $('#on-answer-input').value = '';
       this.buildChoices();
+      this.answerWasReady = false;
     }
     const revealed = s.phase === 'revealed' && !!s.reveal;
     const easy = !!round.choices;
@@ -583,6 +584,13 @@ export class OnlineApp {
       btn.disabled = wrong || !canAnswer;
     }
     $('#on-pass').disabled = !canAnswer;
+    // 답할 수 있게 되는 순간 입력칸에 자동 포커스(매 라운드 다시 클릭하지 않아도 되게)
+    if (canAnswer && !this.answerWasReady && !easy) {
+      const input = $('#on-answer-input');
+      const active = document.activeElement;
+      if (active !== input && !active?.matches?.('[data-volume]')) input.focus();
+    }
+    this.answerWasReady = canAnswer;
     const fb = this.feedbackText();
     $('#on-feedback').textContent = fb.text;
     $('#on-feedback').className = `feedback ${fb.kind}`;

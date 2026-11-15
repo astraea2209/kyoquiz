@@ -437,7 +437,8 @@ export class Room {
       mode: (v) => Object.values(MODE).includes(v),
       rounds: (v) => SCORING.roundOptions.includes(v),
       clipLength: (v) => SCORING.clipLengths.includes(v),
-      difficulty: (v) => Object.values(DIFFICULTY).includes(v),
+      // 매우 어려움(항목별 맞히기)은 개인전 전용
+      difficulty: (v) => Object.values(DIFFICULTY).includes(v) && v !== DIFFICULTY.EXTREME,
       answerTime: (v) => SCORING.multi.answerTimes.includes(v),
     };
     for (const [key, valid] of Object.entries(rules)) {

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { SCORING, answerWindow, scoreFull, scoreMulti, scoreMultiFull, scoreMultiRandom, scoreRandom } from '../js/scoring.js';
+import { SCORING, answerWindow, scoreExtremeBonus, scoreExtremeItem, scoreFull, scoreMulti, scoreMultiFull, scoreMultiRandom, scoreRandom } from '../js/scoring.js';
 
 test('랜덤듣기 점수: 구간 계수', () => {
   assert.equal(scoreRandom({ clipLength: 3, replayUsed: false }), 150);
@@ -65,4 +65,22 @@ test('SCORING.multi 상수', () => {
   assert.deepEqual([...SCORING.multi.answerTimes], [10, 15, 20]);
   assert.equal(SCORING.multi.defaultAnswerTime, 15);
   assert.equal(SCORING.multi.speedBonusMax, 0.5);
+});
+
+test('매우 어려움 항목 점수: 기본 점수를 제목 2 : 가수 1 : 작품명 1로 나눈다', () => {
+  const items = ['title', 'artist', 'anime'];
+  assert.equal(scoreExtremeItem({ base: 100, item: 'title', items }), 50);
+  assert.equal(scoreExtremeItem({ base: 100, item: 'artist', items }), 25);
+  assert.equal(scoreExtremeItem({ base: 150, item: 'anime', items }), 38);
+  // 작품명이 없는 곡은 남은 항목끼리 나눈다
+  assert.equal(scoreExtremeItem({ base: 100, item: 'title', items: ['title', 'artist'] }), 67);
+  assert.equal(scoreExtremeItem({ base: 100, item: 'artist', items: ['title', 'artist'] }), 33);
+  assert.equal(scoreExtremeItem({ base: 100, item: 'title', items: [] }), 0);
+});
+
+test('매우 어려움 보너스와 상수', () => {
+  assert.equal(scoreExtremeBonus(100), 50);
+  assert.equal(scoreExtremeBonus(70), 35);
+  assert.equal(SCORING.extreme.maxWrongAttempts, 5);
+  assert.ok(Object.isFrozen(SCORING.extreme.itemWeights));
 });
