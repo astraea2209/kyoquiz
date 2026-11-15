@@ -295,5 +295,151 @@
     "type": "OP",
     "duration": 96,
     "enabled": true
+  },
+  {
+    "id": "9lana-dyna-mind",
+    "videoId": "E3g5nfvcx58",
+    "title": "DYNA MIND",
+    "titleAliases": ["다이나 마인드", "다이나마인드", "DYNAMIND"],
+    "artist": "9Lana",
+    "artistAliases": ["쿠라나", "くらな"],
+    "type": "일반곡",
+    "duration": 213,
+    "enabled": true
+  },
+  {
+    "id": "9lana-ashiato",
+    "videoId": "5UAeVyBuxnA",
+    "title": "발자국",
+    "titleAliases": ["足跡", "足跡 - Brave the unknown -", "아시아토", "Ashiato", "Brave the unknown", "브레이브 디 언노운"],
+    "artist": "9Lana",
+    "artistAliases": ["쿠라나", "くらな"],
+    "type": "일반곡",
+    "duration": 254,
+    "enabled": true
+  },
+  {
+    "id": "9lana-blue-moon",
+    "videoId": "iGRxE549f7I",
+    "title": "BLUE MOON",
+    "titleAliases": ["블루 문", "블루문"],
+    "artist": "9Lana",
+    "artistAliases": ["쿠라나", "くらな"],
+    "type": "일반곡",
+    "duration": 204,
+    "enabled": true
+  },
+  {
+    "id": "9lana-fake-marriage",
+    "videoId": "WN70qkS0sRk",
+    "title": "페이크 매리지",
+    "titleAliases": ["フェイクマリッジ", "페이크 메리지", "페이크매리지", "Fake Marriage"],
+    "anime": { "name": "우리들 페이크 매리지?", "aliases": ["私たちフェイクマリッジ？", "私たちフェイクマリッジ", "우리들 페이크 메리지", "와타마리", "Watamari"] },
+    "artist": "柊マグネタイト×9Lana×Eye",
+    "artistAliases": ["9Lana", "쿠라나", "Eye", "柊マグネタイト", "히이라기 마그네타이트"],
+    "type": "OST",
+    "duration": 173,
+    "enabled": true
+  },
+  {
+    "id": "9lana-midnight-parade",
+    "videoId": "_zJQAEdwJ9g",
+    "title": "한밤의 퍼레이드",
+    "titleAliases": ["ヨフケノパレエド", "ヨフケノパレエド-MIDNIGHT PARADE-", "요후케노 파레에도", "Yofuke no Pareedo", "MIDNIGHT PARADE", "미드나잇 퍼레이드"],
+    "artist": "9Lana",
+    "artistAliases": ["쿠라나", "くらな"],
+    "type": "일반곡",
+    "duration": 196,
+    "enabled": true
+  },
+  {
+    "id": "9lana-only-way",
+    "videoId": "TGowEYYtKII",
+    "title": "Only Way",
+    "titleAliases": ["온리 웨이", "온리웨이"],
+    "artist": "9Lana",
+    "artistAliases": ["쿠라나", "くらな"],
+    "type": "일반곡",
+    "duration": 172,
+    "enabled": true
+  },
+  {
+    "id": "9lana-kakutei-ippatsu",
+    "videoId": "SQGk5yurNp4",
+    "title": "확정 일발",
+    "titleAliases": ["確定一発", "확정일발", "카쿠테이 잇파츠", "Kakutei Ippatsu"],
+    "artist": "9Lana",
+    "artistAliases": ["쿠라나", "くらな"],
+    "type": "일반곡",
+    "duration": 133,
+    "enabled": true
+  },
+  {
+    "id": "9lana-kyubi",
+    "videoId": "l70B7oRYKoo",
+    "title": "구미",
+    "titleAliases": ["九尾", "큐비", "Kyubi", "Kyuubi"],
+    "artist": "9Lana",
+    "artistAliases": ["쿠라나", "くらな"],
+    "type": "일반곡",
+    "duration": 241,
+    "enabled": true
+  },
+  {
+    "id": "onmyo-kaiten-ed",
+    "videoId": "oYr-W71m2Is",
+    "title": "TURN OVER",
+    "titleAliases": ["턴 오버", "턴오버"],
+    "anime": { "name": "음양회천 Re:버스", "aliases": ["陰陽廻天 Re:バース", "음양회천", "Onmyo Kaiten Re:Birth Verse", "온묘카이텐"] },
+    "artist": "9Lana",
+    "artistAliases": ["쿠라나", "くらな"],
+    "type": "ED",
+    "duration": 215,
+    "enabled": true
+  },
+  {
+    "id": "your-forma-ed",
+    "videoId": "iFhjA038IF4",
+    "title": "네오 러다이트",
+    "titleAliases": ["ネオラダイト", "네오러다이트", "네오라다이토", "Neo Luddite", "NEOLUDDITE"],
+    "anime": { "name": "유어 포르마", "aliases": ["ユア・フォルマ", "Your Forma", "유어포르마"] },
+    "artist": "9Lana",
+    "artistAliases": ["쿠라나", "くらな"],
+    "type": "ED",
+    "duration": 205,
+    "enabled": true
+  },
+  {
+    "id": "9lana-aimai",
+    "videoId": "_hqEfCOuyJg",
+    "title": "Aimai",
+    "titleAliases": ["아이마이", "曖昧", "애매"],
+    "artist": "9Lana",
+    "artistAliases": ["쿠라나", "くらな"],
+    "type": "일반곡",
+    "duration": 221,
+    "enabled": true
+  },
+  {
+    "id": "9lana-chinchirorhythm",
+    "videoId": "RqK3bGxeH98",
+    "title": "친치로리즘",
+    "titleAliases": ["チンチロリズム", "CHINCHIRO-RHYTHM", "친치로 리즘", "Chinchirorhythm"],
+    "artist": "9Lana",
+    "artistAliases": ["쿠라나", "くらな"],
+    "type": "일반곡",
+    "duration": 204,
+    "enabled": true
+  },
+  {
+    "id": "9lana-nandemo-shitaikara",
+    "videoId": "NOlafr17q88",
+    "title": "뭐든지 하고 싶으니까!!",
+    "titleAliases": ["なんでもしたいからッ!!。", "なんでもしたいから", "난데모 시타이카라", "Nandemo Shitaikara", "뭐든 하고 싶으니까"],
+    "artist": "9Lana",
+    "artistAliases": ["쿠라나", "くらな"],
+    "type": "일반곡",
+    "duration": 211,
+    "enabled": true
   }
 ]

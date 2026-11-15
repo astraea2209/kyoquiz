@@ -37,7 +37,7 @@
 - `js/linkParser.js`: YouTube 링크에서 videoId와 `t=` 시작 시간 추출
 - `js/volume.js`: 노래 볼륨(0~100, 기본 80, localStorage `asq.volume`). `VolumeControl`이 개인전·친구와 대결 플레이어 모두에 `setVolume`을 적용하고, 슬라이더(시작 화면, 개인전 게임, 대기실, 대결 게임)는 `bindVolumeInput`으로 같은 값을 공유한다. `js/player.js`는 `unMute` 때 볼륨을 다시 적용한다
 - `js/songs.js`: 곡 스키마(애니송과 일반 노래 공용), songs.json과 localStorage 병합, 영상 길이 캐시, 최고 점수, 설정 저장. 곡 필드: id, videoId, title(유일한 필수값), titleAliases, anime{name, aliases}(선택, 일반 노래는 필드 자체가 없음), artist·artistAliases(선택, 표시·저장만 하고 정답 인정 안 함), type(`SONG_TYPES`: OP, ED, 삽입곡, OST, 캐릭터송, 일반곡, 기타. 비우면 작품이 있으면 OP, 없으면 일반곡), hookStart·skipStart·skipEnd·duration(선택, 초), enabled. 화면에서 `song.anime`은 없을 수 있으니 `?.`로 읽는다
-- `songs.json`: 기본 곡 목록(유명 애니 OP 12곡 + 블리치 OP·ED 15곡, 공식 채널 영상 위주. 블리치 ほうき星 영상은 14분짜리라 `enabled:false`). 제목은 한국어 표기, 원제·로마자·영어는 별칭. 가수는 한국어 표기가 있으면 한국어(예: 요네즈 켄시), 영문·원어 활동명은 그대로(예: YOASOBI, TK from 凛として時雨). `duration`은 점검 스크립트 `--write`로 채움(있으면 게임이 길이 측정용 음소거 로드를 건너뜀). `hookStart`는 아직 없음. `songs.sample.json`: 형식 예시(자리표시자 값)
+- `songs.json`: 기본 곡 목록(유명 애니 OP 12곡 + 블리치 OP·ED 15곡 + 9Lana(쿠라나) 13곡, 공식 채널 영상 위주. 9Lana 곡은 오리지널 10곡(`일반곡`, `anime` 없음), 애니 ED 2곡, 게임 주제가 1곡. 게임 곡은 `anime.name`에 게임 이름을 넣고 type `OST`. 블리치 ほうき星 영상은 14분짜리라 `enabled:false`). 제목은 한국어 표기, 원제·로마자·영어는 별칭. 가수는 한국어 표기가 있으면 한국어(예: 요네즈 켄시), 영문·원어 활동명은 그대로(예: YOASOBI, TK from 凛として時雨). `duration`은 점검 스크립트 `--write`로 채움(있으면 게임이 길이 측정용 음소거 로드를 건너뜀). `hookStart`는 아직 없음. `songs.sample.json`: 형식 예시(자리표시자 값)
 - `tools/check-songs.mjs`: songs.json 점검(oEmbed로 존재·임베드 가능 여부와 채널명, watch 페이지 `lengthSeconds`로 길이, duration 차이, id·videoId 중복). 순수 함수는 export해 `tests/checkSongs.test.js`에서 네트워크 없이 테스트. `formatSongsJson`은 `tools/merge-songs.mjs`도 쓴다
 - `tools/merge-songs.mjs`: 곡 JSON 합치기(`mergeSongLists`, `orderSongFields`, `diffFields`). 테스트는 `tests/mergeSongs.test.js`
 - `tests/`: 단위 테스트 파일 17개(가짜 플레이어·시계·타이머·소켓 포함)
@@ -76,7 +76,7 @@
 
 ## 검증 현황
 
-- 확인함: 단위 테스트 207개 통과(개인전·곡 점검·볼륨·곡 합치기 82개 + 멀티 125개), 모든 JS 파일 `node --check` 통과, 가짜 YT 객체를 넣은 헤드리스 Chrome에서 곡 추가부터 결과 화면까지의 흐름, 실제 브라우저에서 YouTube 재생과 소리·영상(사용자 확인), songs.json 12곡 모두 localhost에서 임베드 재생 오류 없음(2026-11-15), `tools/check-songs.mjs`로 12곡 모두 정상(oEmbed 200, duration 채움, 2026-11-15)
+- 확인함: 단위 테스트 207개 통과(개인전·곡 점검·볼륨·곡 합치기 82개 + 멀티 125개), 모든 JS 파일 `node --check` 통과, 가짜 YT 객체를 넣은 헤드리스 Chrome에서 곡 추가부터 결과 화면까지의 흐름, 실제 브라우저에서 YouTube 재생과 소리·영상(사용자 확인), songs.json 12곡 모두 localhost에서 임베드 재생 오류 없음(2026-11-15), `tools/check-songs.mjs`로 12곡 모두 정상(oEmbed 200, duration 채움, 2026-11-15), 9Lana 13곡 추가 후 40곡 모두 정상(2026-11-16)
 - 실제 YouTube로 확인함(데스크톱 Chromium, 2026-11-15):
   - 0초 소리 누출 없음. iframe의 infoDelivery 메시지로 기록해 보니, 길이를 모르는 5곡 모두 0초 부근에서는 음소거였고 unMute는 구간 시작 위치에서만 일어났다. 3초 구간은 약 3.1초 재생
   - 오버레이는 공개 전까지 무대 전체를 가리고, 공개 때만 현재 플레이어가 보인다. controls=0이라 공개 중에도 제목 표시줄은 안 보임
