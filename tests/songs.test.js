@@ -9,6 +9,7 @@ import {
   mergeSongs,
   normalizeSong,
   parseSongList,
+  searchSongs,
   splitAliases,
 } from '../js/songs.js';
 import { makeSong } from './helpers.js';
@@ -88,6 +89,35 @@ test('normalizeSong: 가수 별칭(artistAliases)은 가수가 있을 때만 보
   const song = fresh.all()[0];
   assert.deepEqual(song.artistAliases, ['IU']);
   assert.ok(!('anime' in song));
+});
+
+test('searchSongs: 제목·작품·가수·별칭·videoId 부분 일치, 공백·대소문자 무시', () => {
+  const songs = [
+    { videoId: 'aaaaaaaaaaa', title: '군청', titleAliases: ['Gunjou'], artist: 'YOASOBI', type: '일반곡' },
+    {
+      videoId: 'bbbbbbbbbbb',
+      title: '아이돌',
+      titleAliases: ['アイドル'],
+      anime: { name: '최애의 아이', aliases: ['Oshi no Ko'] },
+      artist: 'YOASOBI',
+      artistAliases: ['요아소비'],
+      type: 'OP',
+    },
+    { videoId: 'ccccccccccc', title: '밤양갱', titleAliases: [], artist: '비비', type: '일반곡' },
+  ];
+  const ids = (q, limit) => searchSongs(songs, q, limit).matches.map((s) => s.videoId[0]);
+  assert.deepEqual(ids('yoasobi'), ['a', 'b']);
+  assert.deepEqual(ids('요아소비'), ['b']);
+  assert.deepEqual(ids('oshi  NO'), ['b']);
+  assert.deepEqual(ids('최애'), ['b']);
+  assert.deepEqual(ids('gun'), ['a']);
+  assert.deepEqual(ids('ccccc'), ['c']);
+  assert.deepEqual(ids('없는곡'), []);
+  assert.deepEqual(searchSongs(songs, '  ', 20), { matches: [], total: 0 });
+  // limit을 넘으면 matches는 잘리고 total은 전체 수
+  const r = searchSongs(songs, 'yoasobi', 1);
+  assert.equal(r.matches.length, 1);
+  assert.equal(r.total, 2);
 });
 
 test('splitAliases', () => {

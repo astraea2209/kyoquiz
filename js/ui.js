@@ -4,12 +4,13 @@ import { GameSession, MODE, PHASE } from './game.js';
 import { DIFFICULTY } from './judge.js';
 import { parseYouTubeLink } from './linkParser.js';
 import { SCORING } from './scoring.js';
-import { loadSettings, saveSettings, splitAliases } from './songs.js';
+import { loadSettings, saveSettings, searchSongs, splitAliases } from './songs.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
-const MODE_LABEL = { [MODE.RANDOM]: '랜덤듣기', [MODE.FULL]: '전체듣기' };
+const SEARCH_LIMIT = 20;
+const MODE_LABEL ={ [MODE.RANDOM]: '랜덤듣기', [MODE.FULL]: '전체듣기' };
 const DIFFICULTY_LABEL = {
   [DIFFICULTY.EASY]: '쉬움',
   [DIFFICULTY.NORMAL]: '보통',
@@ -431,6 +432,8 @@ export class App {
       this.renderManage();
     });
 
+    $('#song-search').addEventListener('input', () => this.renderSearch());
+
     $('#export-btn').addEventListener('click', () => {
       const json = this.store.exportJson();
       $('#import-text').value = json;
@@ -466,6 +469,7 @@ export class App {
     const songs = this.store.all();
     const enabled = songs.filter((s) => s.enabled).length;
     const box = $('#manage-count');
+    this.renderSearch(songs);
     if (!songs.length) {
       box.textContent = '아직 등록된 곡이 없습니다. 위에서 링크를 붙여넣어 추가해 보세요.';
       return;
@@ -474,6 +478,53 @@ export class App {
       el('strong', { text: String(songs.length) }),
       '곡',
       ...(enabled < songs.length ? [` (사용 ${enabled}곡)`] : []),
+    );
+  }
+
+  /** 곡 찾기 결과. 검색어가 없으면 아무것도 보여 주지 않는다 */
+  renderSearch(songs = this.store.all()) {
+    const query = $('#song-search').value;
+    const { matches, total } = searchSongs(songs, query, SEARCH_LIMIT);
+    const note = $('#song-search-note');
+    if (!query.trim()) note.textContent = '';
+    else if (!total) note.textContent = '찾는 곡이 없습니다.';
+    else note.textContent = total > matches.length ? `${total}곡 중 ${matches.length}곡만 표시합니다. 검색어를 더 자세히 입력해 주세요.` : `${total}곡`;
+
+    $('#song-results').replaceChildren(
+      ...matches.map((song) => {
+        const toggle = el('input', {
+          type: 'checkbox',
+          checked: song.enabled,
+          'aria-label': `${song.title} 사용`,
+          onchange: (e) => {
+            this.store.setEnabled(song.videoId, e.target.checked);
+            this.renderManage();
+          },
+        });
+        const detail = [song.anime?.name, song.type, song.videoId, song.source === 'base' ? 'songs.json' : '직접 추가'];
+        return el(
+          'li',
+          { class: song.enabled ? '' : 'off' },
+          el(
+            'div',
+            { class: 'info' },
+            el('strong', { text: song.artist ? `${song.title} / ${song.artist}` : song.title }),
+            el('span', { text: detail.filter(Boolean).join(' · ') }),
+          ),
+          el('label', { class: 'switch' }, toggle, '사용'),
+          el('button', {
+            type: 'button',
+            class: 'btn small danger',
+            text: '삭제',
+            onclick: () => {
+              if (!confirm(`"${song.title}"을(를) 삭제할까요?`)) return;
+              this.store.remove(song.videoId);
+              this.toast(`삭제했습니다: ${song.title}`);
+              this.renderManage();
+            },
+          }),
+        );
+      }),
     );
   }
 }

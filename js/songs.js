@@ -1,4 +1,5 @@
 // 곡 데이터: 검증, 병합, localStorage 저장, 내보내기/가져오기.
+import { normalizeAnswer } from './judge.js';
 import { isValidVideoId } from './linkParser.js';
 
 export const SONG_TYPES = Object.freeze(['OP', 'ED', '삽입곡', 'OST', '캐릭터송', '일반곡', '기타']);
@@ -101,6 +102,28 @@ export function mergeSongs(baseSongs, userSongs, enabledOverrides = {}, removed 
 }
 
 export const playableSongs = (songs) => songs.filter((s) => s.enabled);
+
+/** 곡을 찾을 때 보는 문자열: 제목·작품·가수(각 별칭 포함)와 videoId */
+const searchTexts = (song) => [
+  song.title,
+  ...(song.titleAliases ?? []),
+  song.anime?.name,
+  ...(song.anime?.aliases ?? []),
+  song.artist,
+  ...(song.artistAliases ?? []),
+  song.videoId,
+];
+
+/**
+ * 곡 검색. 공백·기호·대소문자를 무시한 부분 일치(정답 판정과 같은 정규화). 빈 검색어면 빈 배열.
+ * @returns {{matches: object[], total: number}} matches는 최대 limit개, total은 전체 일치 수
+ */
+export function searchSongs(songs, query, limit = 20) {
+  const q = normalizeAnswer(query);
+  if (!q) return { matches: [], total: 0 };
+  const found = songs.filter((song) => searchTexts(song).some((t) => t && normalizeAnswer(t).includes(q)));
+  return { matches: found.slice(0, limit), total: found.length };
+}
 
 function readJson(storage, key, fallback) {
   try {
