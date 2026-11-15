@@ -38,6 +38,22 @@ test('normalizeSong: 필수값 검사와 기본값', () => {
   });
 });
 
+test('normalizeSong: 가수(artist)는 선택 필드로 보존', () => {
+  const base = { videoId: 'abcdefghijk', title: 't', anime: { name: 'a' } };
+  assert.equal(normalizeSong({ ...base, artist: ' YOASOBI ' }).artist, 'YOASOBI');
+  assert.ok(!('artist' in normalizeSong(base)));
+  assert.ok(!('artist' in normalizeSong({ ...base, artist: '  ' })));
+  assert.ok(!('artist' in normalizeSong({ ...base, artist: 123 })));
+
+  // 추가 → 내보내기 → 가져오기에서도 유지
+  const store = new SongStore(createMemoryStorage(), [makeSong(1, { artist: '기본 가수' })]);
+  store.add({ ...base, artist: 'LiSA' });
+  const fresh = new SongStore(createMemoryStorage(), []);
+  fresh.importJson(store.exportJson());
+  assert.equal(fresh.all().find((s) => s.videoId === 'abcdefghijk').artist, 'LiSA');
+  assert.equal(fresh.all().find((s) => s.videoId === makeSong(1).videoId).artist, '기본 가수');
+});
+
 test('splitAliases', () => {
   assert.deepEqual(splitAliases('a, b，c、 ,d'), ['a', 'b', 'c', 'd']);
   assert.deepEqual(splitAliases(''), []);

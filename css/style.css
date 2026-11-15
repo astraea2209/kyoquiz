@@ -203,6 +203,7 @@ textarea { min-height: 100px; margin: 8px 0; }
 .reveal h2 { margin: 4px 0; }
 .reveal p { margin: 4px 0; }
 .reveal-result { font-weight: 700; }
+.reveal-artist { color: var(--muted); font-weight: 400; font-size: 0.8em; }
 .reveal-result.ok { color: var(--ok); }
 .reveal-result.bad { color: var(--bad); }
 

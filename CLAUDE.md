@@ -6,6 +6,7 @@
 
 - 실행: 이 폴더에서 `python -m http.server 8000` 후 http://localhost:8000 (Windows에서 python이 안 되면 `py -m http.server 8000` 또는 VS Code Live Server)
 - 테스트: `node --test` (또는 `npm test`). 의존성 설치 없음
+- 곡 점검: `node tools/check-songs.mjs` (또는 `npm run check-songs`). 곡마다 한 줄(정상/경고/문제)과 요약만 출력, 문제가 있으면 exit 1. `--write`는 `duration`이 없거나 2초 넘게 틀린 곡을 실제 길이로 고쳐 저장(필드 순서·형식 유지). 곡 확인은 YouTube 검색 HTML을 직접 받지 말고 이 스크립트로 한다(토큰 절약)
 - git: 기본 브랜치 `main`. 작성자 정보는 이 저장소 로컬 설정에만 있다(전역 설정 없음)
 - `index.html`을 file://로 열면 안 된다. YouTube 임베드가 오류 153 등으로 실패하고 songs.json도 못 불러온다. 반드시 http로 서빙
 
@@ -33,9 +34,10 @@
 - `js/scoring.js`: 점수 상수와 계산. 밸런스 조정은 이 파일의 `SCORING`만 바꾼다
 - `js/segment.js`: 랜덤듣기 구간 선택(앞뒤 10% 제외, hookStart ±5초 우선)
 - `js/linkParser.js`: YouTube 링크에서 videoId와 `t=` 시작 시간 추출
-- `js/songs.js`: 곡 스키마, songs.json과 localStorage 병합, 영상 길이 캐시, 최고 점수, 설정 저장
-- `songs.json`: 기본 곡 목록(유명 애니 OP 12곡, 공식 채널 영상 위주). 제목은 한국어 표기, 원제·로마자·영어는 별칭. `hookStart`는 아직 없음. `songs.sample.json`: 형식 예시(자리표시자 값)
-- `tests/`: 단위 테스트 7개(가짜 플레이어 포함)
+- `js/songs.js`: 곡 스키마, songs.json과 localStorage 병합, 영상 길이 캐시, 최고 점수, 설정 저장. 곡 필드: id, videoId, title, titleAliases, anime{name, aliases}, artist(선택, 표시만 하고 정답 인정 안 함), type, hookStart·skipStart·skipEnd·duration(선택, 초), enabled
+- `songs.json`: 기본 곡 목록(유명 애니 OP 12곡, 공식 채널 영상 위주). 제목은 한국어 표기, 원제·로마자·영어는 별칭. 가수는 한국어 표기가 있으면 한국어(예: 요네즈 켄시), 영문·원어 활동명은 그대로(예: YOASOBI, TK from 凛として時雨). `duration`은 점검 스크립트 `--write`로 채움(있으면 게임이 길이 측정용 음소거 로드를 건너뜀). `hookStart`는 아직 없음. `songs.sample.json`: 형식 예시(자리표시자 값)
+- `tools/check-songs.mjs`: songs.json 점검(oEmbed로 존재·임베드 가능 여부와 채널명, watch 페이지 `lengthSeconds`로 길이, duration 차이, id·videoId 중복). 순수 함수는 export해 `tests/checkSongs.test.js`에서 네트워크 없이 테스트
+- `tests/`: 테스트 파일 8개(가짜 플레이어 포함)
 
 ## 게임 규칙 (기획서 기준)
 
@@ -60,18 +62,18 @@
 
 ## 검증 현황
 
-- 확인함: 단위 테스트 59개 통과, 모든 JS 파일 `node --check` 통과, 가짜 YT 객체를 넣은 헤드리스 Chrome에서 곡 추가부터 결과 화면까지의 흐름, 실제 브라우저에서 YouTube 재생과 소리·영상(사용자 확인), songs.json 12곡 모두 localhost에서 임베드 재생 오류 없음(2026-11-15)
+- 확인함: 단위 테스트 67개 통과, 모든 JS 파일 `node --check` 통과, 가짜 YT 객체를 넣은 헤드리스 Chrome에서 곡 추가부터 결과 화면까지의 흐름, 실제 브라우저에서 YouTube 재생과 소리·영상(사용자 확인), songs.json 12곡 모두 localhost에서 임베드 재생 오류 없음(2026-11-15), `tools/check-songs.mjs`로 12곡 모두 정상(oEmbed 200, duration 채움, 2026-11-15)
 - 실제 YouTube로 확인함(데스크톱 Chromium, 2026-11-15):
   - 0초 소리 누출 없음. iframe의 infoDelivery 메시지로 기록해 보니, 길이를 모르는 5곡 모두 0초 부근에서는 음소거였고 unMute는 구간 시작 위치에서만 일어났다. 3초 구간은 약 3.1초 재생
   - 오버레이는 공개 전까지 무대 전체를 가리고, 공개 때만 현재 플레이어가 보인다. controls=0이라 공개 중에도 제목 표시줄은 안 보임
   - 재생 오류: 존재하지 않는 videoId는 실제로 오류 150을 낸다. 첫 곡일 때는 곡 교체 후 재생 버튼 대기와 라운드 축소, 다음 곡으로 cue해 둔 곡일 때는 cue 오류를 무시하고 차례가 오면 종료 처리. 둘 다 정상
-- 확인하지 못함: iOS 등 모바일에서 unMute 후 소리, 영상이 끝까지 재생된 뒤 추천 영상 화면(정답 공개 중에만 보일 수 있음), 오류 101·150 중 "임베드 금지" 영상의 실제 동작
+- 확인하지 못함: 가수 표시(정답 공개 화면, 곡 관리 목록·폼)를 실제 브라우저에서 눈으로 보지 않음(문법 검사와 저장·내보내기 테스트만), oEmbed 200이어도 실제 임베드 재생이 막힌 경우는 스크립트로 못 잡음, iOS 등 모바일에서 unMute 후 소리, 영상이 끝까지 재생된 뒤 추천 영상 화면(정답 공개 중에만 보일 수 있음), 오류 101·150 중 "임베드 금지" 영상의 실제 동작
 
 ## 다음 작업 후보 (기획서 개발 단계)
 
 1. (데스크톱 점검 완료) 모바일, 특히 iOS Safari에서 소리와 재생 흐름 확인. 곡별 `hookStart`(후렴 시작 초) 채우기
 2. 난이도, 구간 길이, 별칭 매칭 다듬기
-3. 곡 등록 도구 보강(목록 정기 점검, 삭제·차단된 영상 정리)
+3. 곡 등록 도구 보강: 점검 스크립트와 가수 필드 완료. 남은 것: 점검 결과로 삭제·차단된 영상 정리(자동 비활성화 등), 정기 점검 방식
 4. 확장 모드(작품명 맞추기, 서바이벌, 타임어택), 친구와 대결 모드(서버와 재생 시작 시점 동기화 필요)
 
 ## 미결정 사항

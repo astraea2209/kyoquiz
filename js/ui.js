@@ -294,7 +294,10 @@ export class App {
       const resultEl = $('#reveal-result');
       resultEl.textContent = RESULT_TEXT[reason](points);
       resultEl.className = `reveal-result ${reason === 'correct' ? 'ok' : 'bad'}`;
-      $('#reveal-title').textContent = round.song.title;
+      $('#reveal-title').replaceChildren(
+        round.song.title,
+        ...(round.song.artist ? [el('span', { class: 'reveal-artist', text: ` / ${round.song.artist}` })] : []),
+      );
       $('#reveal-anime').textContent = `${round.song.anime.name} · ${round.song.type}`;
       $('#next-btn').textContent = game.hasNext ? '다음 곡' : '결과 보기';
     }
@@ -410,6 +413,7 @@ export class App {
         videoId: parsed.videoId,
         title: f.title.value,
         titleAliases: splitAliases(f.titleAliases.value),
+        artist: f.artist.value,
         anime: { name: f.animeName.value, aliases: splitAliases(f.animeAliases.value) },
         type: f.type.value,
         hookStart: f.hookStart.value === '' ? undefined : Number(f.hookStart.value),
@@ -482,7 +486,7 @@ export class App {
           el(
             'div',
             { class: 'info' },
-            el('strong', { text: song.title }),
+            el('strong', { text: song.artist ? `${song.title} / ${song.artist}` : song.title }),
             el('span', {
               text: `${song.anime.name} · ${song.type} · ${song.videoId}${song.hookStart != null ? ` · hook ${song.hookStart}s` : ''} · ${song.source === 'base' ? 'songs.json' : '직접 추가'}`,
             }),

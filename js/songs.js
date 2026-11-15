@@ -52,6 +52,9 @@ export function normalizeSong(raw) {
     type: SONG_TYPES.includes(raw.type) ? raw.type : 'OP',
     enabled: raw.enabled !== false,
   };
+  // 가수(선택). 화면 표시용이며 정답으로 인정하지 않는다
+  const artist = typeof raw.artist === 'string' ? raw.artist.trim() : '';
+  if (artist) song.artist = artist;
   for (const key of ['hookStart', 'skipStart', 'skipEnd', 'duration']) {
     const v = optionalSeconds(raw[key]);
     if (v !== undefined) song[key] = v;

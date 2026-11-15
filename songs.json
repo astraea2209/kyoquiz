@@ -5,7 +5,9 @@
     "title": "잔혹한 천사의 테제",
     "titleAliases": ["残酷な天使のテーゼ", "Zankoku na Tenshi no These", "A Cruel Angel's Thesis"],
     "anime": { "name": "신세기 에반게리온", "aliases": ["에반게리온", "에바", "新世紀エヴァンゲリオン", "Neon Genesis Evangelion", "Evangelion"] },
+    "artist": "타카하시 요코",
     "type": "OP",
+    "duration": 244,
     "enabled": true
   },
   {
@@ -14,7 +16,9 @@
     "title": "홍련의 화살",
     "titleAliases": ["紅蓮の弓矢", "Guren no Yumiya"],
     "anime": { "name": "진격의 거인", "aliases": ["진격거", "進撃の巨人", "Attack on Titan", "Shingeki no Kyojin"] },
+    "artist": "Linked Horizon",
     "type": "OP",
+    "duration": 92,
     "enabled": true
   },
   {
@@ -23,7 +27,9 @@
     "title": "unravel",
     "titleAliases": ["언라벨"],
     "anime": { "name": "도쿄 구울", "aliases": ["東京喰種", "Tokyo Ghoul"] },
+    "artist": "TK from 凛として時雨",
     "type": "OP",
+    "duration": 242,
     "enabled": true
   },
   {
@@ -32,7 +38,9 @@
     "title": "홍련화",
     "titleAliases": ["紅蓮華", "Gurenge"],
     "anime": { "name": "귀멸의 칼날", "aliases": ["鬼滅の刃", "Demon Slayer", "Kimetsu no Yaiba"] },
+    "artist": "LiSA",
     "type": "OP",
+    "duration": 123,
     "enabled": true
   },
   {
@@ -41,7 +49,9 @@
     "title": "회회기담",
     "titleAliases": ["廻廻奇譚", "Kaikai Kitan"],
     "anime": { "name": "주술회전", "aliases": ["呪術廻戦", "Jujutsu Kaisen"] },
+    "artist": "Eve",
     "type": "OP",
+    "duration": 223,
     "enabled": true
   },
   {
@@ -50,7 +60,9 @@
     "title": "푸른 보금자리",
     "titleAliases": ["아오노 스미카", "青のすみか", "Ao no Sumika", "Where Our Blue Is"],
     "anime": { "name": "주술회전", "aliases": ["주술회전 2기", "呪術廻戦", "Jujutsu Kaisen"] },
+    "artist": "키타니 타츠야",
     "type": "OP",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -59,7 +71,9 @@
     "title": "KICK BACK",
     "titleAliases": ["킥백", "킥 백"],
     "anime": { "name": "체인소 맨", "aliases": ["チェンソーマン", "Chainsaw Man"] },
+    "artist": "요네즈 켄시",
     "type": "OP",
+    "duration": 227,
     "enabled": true
   },
   {
@@ -68,7 +82,9 @@
     "title": "믹스넛",
     "titleAliases": ["믹스 너츠", "ミックスナッツ", "Mixed Nuts"],
     "anime": { "name": "스파이 패밀리", "aliases": ["SPY×FAMILY", "스파패"] },
+    "artist": "Official髭男dism",
     "type": "OP",
+    "duration": 229,
     "enabled": true
   },
   {
@@ -77,7 +93,9 @@
     "title": "아이돌",
     "titleAliases": ["アイドル", "Idol"],
     "anime": { "name": "최애의 아이", "aliases": ["오시노코", "【推しの子】", "推しの子", "Oshi no Ko"] },
+    "artist": "YOASOBI",
     "type": "OP",
+    "duration": 226,
     "enabled": true
   },
   {
@@ -86,7 +104,9 @@
     "title": "축복",
     "titleAliases": ["祝福", "Shukufuku", "The Blessing"],
     "anime": { "name": "기동전사 건담 수성의 마녀", "aliases": ["수성의 마녀", "機動戦士ガンダム 水星の魔女", "水星の魔女", "The Witch from Mercury"] },
+    "artist": "YOASOBI",
     "type": "OP",
+    "duration": 198,
     "enabled": true
   },
   {
@@ -95,7 +115,9 @@
     "title": "only my railgun",
     "titleAliases": ["온리 마이 레일건"],
     "anime": { "name": "어떤 과학의 초전자포", "aliases": ["초전자포", "레일건", "とある科学の超電磁砲", "A Certain Scientific Railgun"] },
+    "artist": "fripSide",
     "type": "OP",
+    "duration": 264,
     "enabled": true
   },
   {
@@ -104,7 +126,9 @@
     "title": "커넥트",
     "titleAliases": ["コネクト", "Connect"],
     "anime": { "name": "마법소녀 마도카☆마기카", "aliases": ["마도카 마기카", "마마마", "魔法少女まどか☆マギカ", "Puella Magi Madoka Magica"] },
+    "artist": "ClariS",
     "type": "OP",
+    "duration": 267,
     "enabled": true
   }
 ]
