@@ -164,14 +164,20 @@
         <label>곡 제목 <input name="title" required /></label>
         <label>제목 별칭 (쉼표로 구분) <input name="titleAliases" /></label>
         <label>가수 (선택, 정답으로 인정하지 않음) <input name="artist" /></label>
-        <label>작품명 <input name="animeName" required /></label>
-        <label>작품 별칭 (쉼표로 구분) <input name="animeAliases" /></label>
+        <label>가수 별칭 (선택, 쉼표로 구분) <input name="artistAliases" /></label>
+        <label>작품명 (선택) <input name="animeName" /></label>
+        <label>작품 별칭 (선택, 쉼표로 구분) <input name="animeAliases" /></label>
         <div class="row">
           <label>종류
             <select name="type">
+              <option value="" title="작품명이 있으면 OP, 없으면 일반곡">자동</option>
               <option value="OP">OP</option>
               <option value="ED">ED</option>
               <option value="삽입곡">삽입곡</option>
+              <option value="OST">OST</option>
+              <option value="캐릭터송">캐릭터송</option>
+              <option value="일반곡">일반곡</option>
+              <option value="기타">기타</option>
             </select>
           </label>
           <label>hookStart (초, 선택) <input name="hookStart" type="number" min="0" step="1" inputmode="numeric" /></label>
@@ -179,8 +185,8 @@
         <button type="submit" class="btn primary">곡 추가</button>
       </form>
 
-      <h2>등록된 곡 <span id="manage-count"></span></h2>
-      <ul id="song-list" class="song-list"></ul>
+      <h2>등록된 곡</h2>
+      <p class="manage-count" id="manage-count"></p>
 
       <h2>내보내기 · 가져오기</h2>
       <div class="actions">

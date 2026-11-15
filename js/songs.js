@@ -1,7 +1,10 @@
 // 곡 데이터: 검증, 병합, localStorage 저장, 내보내기/가져오기.
 import { isValidVideoId } from './linkParser.js';
 
-export const SONG_TYPES = Object.freeze(['OP', 'ED', '삽입곡']);
+export const SONG_TYPES = Object.freeze(['OP', 'ED', '삽입곡', 'OST', '캐릭터송', '일반곡', '기타']);
+
+/** 종류가 없거나 목록에 없을 때: 작품이 있으면 OP, 없으면 일반곡 */
+const defaultType = (hasAnime) => (hasAnime ? 'OP' : '일반곡');
 
 export const STORAGE_KEYS = Object.freeze({
   userSongs: 'asq.userSongs',
@@ -33,28 +36,33 @@ export function splitAliases(text) {
 }
 
 /**
- * 원시 객체를 곡 스키마로 정리한다. 필수값(videoId, title, anime.name)이 없으면 null.
+ * 원시 객체를 곡 스키마로 정리한다. 필수값(videoId, title)이 없으면 null.
+ * 작품(anime)과 가수(artist, artistAliases)는 선택이며, 값이 없으면 필드를 넣지 않는다.
  */
 export function normalizeSong(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const videoId = String(raw.videoId ?? '').trim();
   const title = String(raw.title ?? '').trim();
+  if (!isValidVideoId(videoId) || !title) return null;
   const animeRaw = typeof raw.anime === 'string' ? { name: raw.anime } : raw.anime ?? {};
   const animeName = String(animeRaw.name ?? '').trim();
-  if (!isValidVideoId(videoId) || !title || !animeName) return null;
 
   const song = {
     id: String(raw.id ?? videoId),
     videoId,
     title,
     titleAliases: toStringList(raw.titleAliases),
-    anime: { name: animeName, aliases: toStringList(animeRaw.aliases) },
-    type: SONG_TYPES.includes(raw.type) ? raw.type : 'OP',
-    enabled: raw.enabled !== false,
   };
+  if (animeName) song.anime = { name: animeName, aliases: toStringList(animeRaw.aliases) };
+  song.type = SONG_TYPES.includes(raw.type) ? raw.type : defaultType(!!animeName);
+  song.enabled = raw.enabled !== false;
   // 가수(선택). 화면 표시용이며 정답으로 인정하지 않는다
   const artist = typeof raw.artist === 'string' ? raw.artist.trim() : '';
-  if (artist) song.artist = artist;
+  if (artist) {
+    song.artist = artist;
+    const artistAliases = toStringList(raw.artistAliases);
+    if (artistAliases.length) song.artistAliases = artistAliases;
+  }
   for (const key of ['hookStart', 'skipStart', 'skipEnd', 'duration']) {
     const v = optionalSeconds(raw[key]);
     if (v !== undefined) song[key] = v;

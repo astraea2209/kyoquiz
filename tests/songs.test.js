@@ -16,7 +16,7 @@ import { makeSong } from './helpers.js';
 test('normalizeSong: 필수값 검사와 기본값', () => {
   assert.equal(normalizeSong({ videoId: 'bad', title: 'a', anime: { name: 'b' } }), null);
   assert.equal(normalizeSong({ videoId: 'abcdefghijk', title: '', anime: { name: 'b' } }), null);
-  assert.equal(normalizeSong({ videoId: 'abcdefghijk', title: 'a', anime: {} }), null);
+  assert.equal(normalizeSong({ videoId: 'abcdefghijk', anime: { name: 'b' } }), null);
   const s = normalizeSong({
     videoId: 'abcdefghijk',
     title: ' 제목 ',
@@ -52,6 +52,42 @@ test('normalizeSong: 가수(artist)는 선택 필드로 보존', () => {
   fresh.importJson(store.exportJson());
   assert.equal(fresh.all().find((s) => s.videoId === 'abcdefghijk').artist, 'LiSA');
   assert.equal(fresh.all().find((s) => s.videoId === makeSong(1).videoId).artist, '기본 가수');
+});
+
+test('normalizeSong: 일반 노래는 제목만 있으면 되고 작품 필드를 넣지 않는다', () => {
+  const s = normalizeSong({ videoId: 'abcdefghijk', title: '밤양갱', anime: { name: '  ', aliases: ['x'] } });
+  assert.deepEqual(s, {
+    id: 'abcdefghijk',
+    videoId: 'abcdefghijk',
+    title: '밤양갱',
+    titleAliases: [],
+    type: '일반곡',
+    enabled: true,
+  });
+  assert.equal(normalizeSong({ videoId: 'abcdefghijk', title: 't' }).type, '일반곡');
+  // 작품이 있으면 종류 기본값은 OP, 지정한 종류는 그대로
+  assert.equal(normalizeSong({ videoId: 'abcdefghijk', title: 't', anime: 'a', type: '' }).type, 'OP');
+  for (const type of ['OST', '캐릭터송', '일반곡', '기타', '삽입곡']) {
+    assert.equal(normalizeSong({ videoId: 'abcdefghijk', title: 't', type }).type, type);
+  }
+});
+
+test('normalizeSong: 가수 별칭(artistAliases)은 가수가 있을 때만 보존', () => {
+  const base = { videoId: 'abcdefghijk', title: 't' };
+  assert.deepEqual(normalizeSong({ ...base, artist: '아이유', artistAliases: 'IU, 李知恩' }).artistAliases, [
+    'IU',
+    '李知恩',
+  ]);
+  assert.ok(!('artistAliases' in normalizeSong({ ...base, artist: '아이유', artistAliases: [] })));
+  assert.ok(!('artistAliases' in normalizeSong({ ...base, artistAliases: ['IU'] })));
+
+  const store = new SongStore(createMemoryStorage(), []);
+  store.add({ ...base, artist: '아이유', artistAliases: ['IU'] });
+  const fresh = new SongStore(createMemoryStorage(), []);
+  fresh.importJson(store.exportJson());
+  const song = fresh.all()[0];
+  assert.deepEqual(song.artistAliases, ['IU']);
+  assert.ok(!('anime' in song));
 });
 
 test('splitAliases', () => {

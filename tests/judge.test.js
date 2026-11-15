@@ -99,3 +99,11 @@ test('객관식 보기: 곡이 적으면 가능한 만큼', () => {
   assert.equal(canUseMultipleChoice([makeSong(1)]), false);
   assert.equal(canUseMultipleChoice([makeSong(1), makeSong(2, { title: 'Song Title 1' })]), false);
 });
+
+test('judgeAnswer: 작품명이 없는 일반 노래는 보통 난이도에서도 제목·별칭만 인정', () => {
+  const song = { videoId: 'abcdefghijk', title: '밤양갱', titleAliases: ['Bam Yang Gang'], artist: '비비', type: '일반곡' };
+  assert.equal(judgeAnswer('밤양갱', song, DIFFICULTY.NORMAL).correct, true);
+  assert.equal(judgeAnswer('bam yang gang', song, DIFFICULTY.NORMAL).correct, true);
+  assert.equal(judgeAnswer('비비', song, DIFFICULTY.NORMAL).correct, false);
+  assert.equal(judgeAnswer('밤양갱', song, DIFFICULTY.HARD).correct, true);
+});

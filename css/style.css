@@ -226,14 +226,8 @@ textarea { min-height: 100px; margin: 8px 0; }
 .song-form { display: grid; gap: 10px; background: var(--panel); padding: 14px; border-radius: var(--radius); }
 .song-form label { display: grid; gap: 4px; font-size: 0.9rem; color: var(--muted); }
 .song-form .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.song-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
-.song-list li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--panel); border-radius: var(--radius); }
-.song-list li.off { opacity: 0.5; }
-.song-list .info { flex: 1; min-width: 0; }
-.song-list .info strong, .song-list .info span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.song-list .info span { color: var(--muted); font-size: 0.85rem; }
-.switch { display: flex; align-items: center; gap: 6px; min-height: var(--tap); font-size: 0.85rem; }
-.switch input { width: 22px; height: 22px; min-height: 0; }
+.manage-count { margin: 0; padding: 12px 14px; background: var(--panel); border-radius: var(--radius); font-size: 1.05rem; }
+.manage-count strong { font-size: 1.4rem; }
 
 /* 토스트 */
 .toasts { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom)); transform: translateX(-50%); display: grid; gap: 8px; width: min(92vw, 520px); z-index: 100; pointer-events: none; }

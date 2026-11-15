@@ -298,7 +298,7 @@ export class App {
         round.song.title,
         ...(round.song.artist ? [el('span', { class: 'reveal-artist', text: ` / ${round.song.artist}` })] : []),
       );
-      $('#reveal-anime').textContent = `${round.song.anime.name} · ${round.song.type}`;
+      $('#reveal-anime').textContent = [round.song.anime?.name, round.song.type].filter(Boolean).join(' · ');
       $('#next-btn').textContent = game.hasNext ? '다음 곡' : '결과 보기';
     }
   }
@@ -367,7 +367,7 @@ export class App {
           {},
           el('span', { class: 'pts', text: `${h.points}점` }),
           el('span', { class: h.correct ? 'ok' : 'bad', text: h.correct ? '○ ' : '× ' }),
-          `${h.song.title} — ${h.song.anime.name}`,
+          [h.song.title, h.song.anime?.name ?? h.song.artist].filter(Boolean).join(' — '),
         ),
       ),
     );
@@ -414,13 +414,14 @@ export class App {
         title: f.title.value,
         titleAliases: splitAliases(f.titleAliases.value),
         artist: f.artist.value,
+        artistAliases: splitAliases(f.artistAliases.value),
         anime: { name: f.animeName.value, aliases: splitAliases(f.animeAliases.value) },
         type: f.type.value,
         hookStart: f.hookStart.value === '' ? undefined : Number(f.hookStart.value),
         enabled: true,
       });
       if (!song) {
-        this.toast('곡 제목과 작품명을 입력해 주세요.');
+        this.toast('곡 제목을 입력해 주세요.');
         return;
       }
       this.toast(exists ? `같은 영상이 있어 교체했습니다: ${song.title}` : `추가했습니다: ${song.title}`);
@@ -463,47 +464,16 @@ export class App {
 
   renderManage() {
     const songs = this.store.all();
-    $('#manage-count').textContent = `(${songs.filter((s) => s.enabled).length} / ${songs.length})`;
-    const list = $('#song-list');
+    const enabled = songs.filter((s) => s.enabled).length;
+    const box = $('#manage-count');
     if (!songs.length) {
-      list.replaceChildren(el('li', { text: '아직 등록된 곡이 없습니다. 위에서 링크를 붙여넣어 추가해 보세요.' }));
+      box.textContent = '아직 등록된 곡이 없습니다. 위에서 링크를 붙여넣어 추가해 보세요.';
       return;
     }
-    list.replaceChildren(
-      ...songs.map((song) => {
-        const toggle = el('input', {
-          type: 'checkbox',
-          checked: song.enabled,
-          'aria-label': `${song.title} 사용`,
-          onchange: (e) => {
-            this.store.setEnabled(song.videoId, e.target.checked);
-            this.renderManage();
-          },
-        });
-        return el(
-          'li',
-          { class: song.enabled ? '' : 'off' },
-          el(
-            'div',
-            { class: 'info' },
-            el('strong', { text: song.artist ? `${song.title} / ${song.artist}` : song.title }),
-            el('span', {
-              text: `${song.anime.name} · ${song.type} · ${song.videoId}${song.hookStart != null ? ` · hook ${song.hookStart}s` : ''} · ${song.source === 'base' ? 'songs.json' : '직접 추가'}`,
-            }),
-          ),
-          el('label', { class: 'switch' }, toggle, '사용'),
-          el('button', {
-            type: 'button',
-            class: 'btn small danger',
-            text: '삭제',
-            onclick: () => {
-              if (!confirm(`"${song.title}"을(를) 삭제할까요?`)) return;
-              this.store.remove(song.videoId);
-              this.renderManage();
-            },
-          }),
-        );
-      }),
+    box.replaceChildren(
+      el('strong', { text: String(songs.length) }),
+      '곡',
+      ...(enabled < songs.length ? [` (사용 ${enabled}곡)`] : []),
     );
   }
 }
