@@ -5,6 +5,7 @@
   "description": "애니송 맞추기 웹게임 프로토타입 (의존성 없음, 빌드 불필요)",
   "scripts": {
     "test": "node --test",
+    "check-songs": "node tools/check-songs.mjs",
     "server:dev": "npx wrangler dev",
     "server:deploy": "npx wrangler deploy"
   }

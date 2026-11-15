@@ -5,6 +5,7 @@
     "title": "곡 제목 1",
     "titleAliases": ["Song Title 1", "曲名1"],
     "anime": { "name": "작품명 A", "aliases": ["Anime A", "作品A"] },
+    "artist": "가수 A",
     "type": "OP",
     "hookStart": 45,
     "enabled": true
@@ -15,6 +16,7 @@
     "title": "곡 제목 2",
     "titleAliases": [],
     "anime": { "name": "작품명 B", "aliases": [] },
+    "artist": "가수 B",
     "type": "ED",
     "skipStart": 8,
     "skipEnd": 15,

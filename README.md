@@ -60,7 +60,7 @@ http://localhost:8000 에서 "친구와 대결"을 누르면 로컬 서버에 �
 1. 시작 화면에서 **곡 관리**를 누릅니다.
 2. YouTube 링크를 붙여넣으면 영상 ID가 자동으로 추출됩니다. 지원 형식은 `youtu.be/ID`, `watch?v=ID`, `/shorts/ID`, `/embed/ID`, `/live/ID`, `music.youtube.com`, 11자리 ID 단독 입력입니다.
 3. 링크에 `t=45`나 `t=1m5s`가 있으면 hookStart 초기값으로 들어갑니다.
-4. 제목, 제목 별칭(쉼표 구분), 작품명, 작품 별칭, 종류, hookStart를 입력하고 **곡 추가**를 누릅니다.
+4. 제목, 제목 별칭(쉼표 구분), 가수(선택), 작품명, 작품 별칭, 종류, hookStart를 입력하고 **곡 추가**를 누릅니다.
 5. 목록에서 사용 여부를 켜고 끄거나 곡을 삭제할 수 있습니다. **JSON 내보내기·가져오기**도 지원합니다.
 
 직접 추가한 곡과 사용 여부 설정은 브라우저 localStorage에 저장되며 `songs.json`과 합쳐집니다. videoId가 같으면 직접 추가한 항목이 우선합니다. `songs.json`에 있는 곡을 삭제하면 이 브라우저에서만 숨겨집니다.
@@ -76,6 +76,7 @@ http://localhost:8000 에서 "친구와 대결"을 누르면 로컬 서버에 �
   "title": "곡 제목",
   "titleAliases": ["제목 별칭"],
   "anime": { "name": "작품명", "aliases": ["작품 별칭"] },
+  "artist": "가수",
   "type": "OP | ED | 삽입곡",
   "hookStart": 45,
   "skipStart": 5,
@@ -86,6 +87,7 @@ http://localhost:8000 에서 "친구와 대결"을 누르면 로컬 서버에 �
 ```
 
 `hookStart`, `skipStart`, `skipEnd`, `duration`은 선택 항목이며 단위는 초입니다.
+`artist`(가수)도 선택 항목입니다. 정답 공개 화면에 "곡 제목 / 가수"로 표시되며, 가수 이름은 정답으로 인정하지 않습니다.
 한글·일본어·영어 표기 차이는 자동으로 바꾸지 않으므로, 인정할 표기를 별칭에 넣어 주세요.
 퍼가기(임베드)가 금지된 영상은 재생 오류(101/150)가 나서 게임 중에 자동으로 건너뜁니다.
 
@@ -120,6 +122,7 @@ js/ui.js            화면 렌더링·이벤트
 js/main.js          진입점
 songs.json          기본 곡 목록(빈 배열)
 songs.sample.json   형식 예시(자리표시자)
+tools/check-songs.mjs  songs.json 점검(영상 존재·임베드 가능, 길이, 중복)
 tests/              node --test 테스트와 가짜 플레이어(helpers.js)
 ```
 
@@ -138,8 +141,17 @@ tests/              node --test 테스트와 가짜 플레이어(helpers.js)
 ```bash
 cd anime-song-quiz
 node --test                                   # 단위·상태 머신 테스트
-for f in js/*.js tests/*.js; do node --check "$f"; done   # 문법 검사(package.json의 "type": "module" 덕분에 ESM으로 검사)
+for f in js/*.js tests/*.js tools/*.mjs; do node --check "$f"; done   # 문법 검사(package.json의 "type": "module" 덕분에 ESM으로 검사)
 ```
+
+### 곡 목록 점검
+
+```bash
+node tools/check-songs.mjs           # 또는 npm run check-songs. 다른 파일: node tools/check-songs.mjs 경로.json
+node tools/check-songs.mjs --write   # duration이 없거나 2초 넘게 틀린 곡을 실제 길이로 고쳐 저장
+```
+
+인터넷이 필요합니다. YouTube oEmbed 응답 코드로 영상 존재·임베드 가능 여부를(401·403 임베드 금지, 400·404 없음), watch 페이지의 `lengthSeconds`로 길이를 확인하고, `duration` 차이와 `id`·`videoId` 중복을 검사합니다. 곡마다 한 줄씩 정상/경고/문제를 출력하고 마지막에 요약합니다. 문제가 있으면 종료 코드 1입니다.
 
 `game.js`는 플레이어를 인터페이스로 주입받으므로, 테스트에서는 `tests/helpers.js`의 `FakePlayer`로 재생 상태, 오류, 시간 흐름을 흉내 냅니다.
 

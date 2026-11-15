@@ -6,6 +6,7 @@
 
 - 실행: 이 폴더에서 `python -m http.server 8000` 후 http://localhost:8000 (Windows에서 python이 안 되면 `py -m http.server 8000` 또는 VS Code Live Server)
 - 테스트: `node --test` (또는 `npm test`). 의존성 설치 없음
+- 곡 점검: `node tools/check-songs.mjs` (또는 `npm run check-songs`). 곡마다 한 줄(정상/경고/문제)과 요약만 출력, 문제가 있으면 exit 1. `--write`는 `duration`이 없거나 2초 넘게 틀린 곡을 실제 길이로 고쳐 저장(필드 순서·형식 유지). 곡 확인은 YouTube 검색 HTML을 직접 받지 말고 이 스크립트로 한다(토큰 절약)
 - git: 기본 브랜치 `main`. 작성자 정보는 이 저장소 로컬 설정에만 있다(전역 설정 없음)
 - `index.html`을 file://로 열면 안 된다. YouTube 임베드가 오류 153 등으로 실패하고 songs.json도 못 불러온다. 반드시 http로 서빙
 
@@ -33,9 +34,10 @@
 - `js/scoring.js`: 점수 상수와 계산. 밸런스 조정은 이 파일의 `SCORING`만 바꾼다. 멀티용은 `SCORING.multi`(속도 보너스 +50%, 답변 시간 10/15/20초, 인원 2~8)와 `scoreMulti`, `answerWindow`
 - `js/segment.js`: 랜덤듣기 구간 선택(앞뒤 10% 제외, hookStart ±5초 우선)
 - `js/linkParser.js`: YouTube 링크에서 videoId와 `t=` 시작 시간 추출
-- `js/songs.js`: 곡 스키마, songs.json과 localStorage 병합, 영상 길이 캐시, 최고 점수, 설정 저장
-- `songs.json`: 기본 곡 목록(유명 애니 OP 12곡, 공식 채널 영상 위주). 제목은 한국어 표기, 원제·로마자·영어는 별칭. `hookStart`는 아직 없음. `songs.sample.json`: 형식 예시(자리표시자 값)
-- `tests/`: 단위 테스트 파일 13개(가짜 플레이어·시계·타이머·소켓 포함)
+- `js/songs.js`: 곡 스키마, songs.json과 localStorage 병합, 영상 길이 캐시, 최고 점수, 설정 저장. 곡 필드: id, videoId, title, titleAliases, anime{name, aliases}, artist(선택, 표시만 하고 정답 인정 안 함), type, hookStart·skipStart·skipEnd·duration(선택, 초), enabled
+- `songs.json`: 기본 곡 목록(유명 애니 OP 12곡, 공식 채널 영상 위주). 제목은 한국어 표기, 원제·로마자·영어는 별칭. 가수는 한국어 표기가 있으면 한국어(예: 요네즈 켄시), 영문·원어 활동명은 그대로(예: YOASOBI, TK from 凛として時雨). `duration`은 점검 스크립트 `--write`로 채움(있으면 게임이 길이 측정용 음소거 로드를 건너뜀). `hookStart`는 아직 없음. `songs.sample.json`: 형식 예시(자리표시자 값)
+- `tools/check-songs.mjs`: songs.json 점검(oEmbed로 존재·임베드 가능 여부와 채널명, watch 페이지 `lengthSeconds`로 길이, duration 차이, id·videoId 중복). 순수 함수는 export해 `tests/checkSongs.test.js`에서 네트워크 없이 테스트
+- `tests/`: 단위 테스트 파일 15개(가짜 플레이어·시계·타이머·소켓 포함)
 - 멀티플레이(친구와 대결, 선착순) 핵심부. 설계는 Claude Docs 문서 "애니송 맞추기 멀티플레이 기획서"(https://claude.ai/artifact/3BLyVFbGYGhL7hk2pjG7SM). 서버 런타임과 멀티 화면에 의존하지 않는 부분만 구현됨:
   - `server/room.js`: `Room` 방 상태 머신(대기실→준비→시작 대기→답변→공개→결과). 시계(`now`), 난수(`rng`), 타이머(`timers`), 전송(`send(connId, msg)`), 토큰 생성(`genToken`)을 주입받는다. 어댑터는 `handleMessage(connId, msg)`와 `handleDisconnect(connId)`만 부르면 된다. 판정·구간 선택·점수는 `js/judge.js`, `js/segment.js`, `js/scoring.js`를 그대로 import. 시간·한도 상수는 `ROOM_CONFIG`(생성 때 `config`로 덮어쓰기)
   - `server/roomHost.js`: `RoomHost`. Room을 소켓({send, close})에 연결하는 런타임 무관 계층(JSON 파싱, 메시지 크기 2KB·빈도 40개/5초 제한, join 10초 제한, 빈 방 60초 뒤 닫기, 방이 닫히면 소켓 정리)
@@ -71,12 +73,12 @@
 
 ## 검증 현황
 
-- 확인함: 단위 테스트 179개 통과(개인전 59개 + 멀티 120개), 모든 JS 파일 `node --check` 통과, 가짜 YT 객체를 넣은 헤드리스 Chrome에서 곡 추가부터 결과 화면까지의 흐름, 실제 브라우저에서 YouTube 재생과 소리·영상(사용자 확인), songs.json 12곡 모두 localhost에서 임베드 재생 오류 없음(2026-11-15)
+- 확인함: 단위 테스트 187개 통과(개인전·곡 점검 67개 + 멀티 120개), 모든 JS 파일 `node --check` 통과, 가짜 YT 객체를 넣은 헤드리스 Chrome에서 곡 추가부터 결과 화면까지의 흐름, 실제 브라우저에서 YouTube 재생과 소리·영상(사용자 확인), songs.json 12곡 모두 localhost에서 임베드 재생 오류 없음(2026-11-15), `tools/check-songs.mjs`로 12곡 모두 정상(oEmbed 200, duration 채움, 2026-11-15)
 - 실제 YouTube로 확인함(데스크톱 Chromium, 2026-11-15):
   - 0초 소리 누출 없음. iframe의 infoDelivery 메시지로 기록해 보니, 길이를 모르는 5곡 모두 0초 부근에서는 음소거였고 unMute는 구간 시작 위치에서만 일어났다. 3초 구간은 약 3.1초 재생
   - 오버레이는 공개 전까지 무대 전체를 가리고, 공개 때만 현재 플레이어가 보인다. controls=0이라 공개 중에도 제목 표시줄은 안 보임
   - 재생 오류: 존재하지 않는 videoId는 실제로 오류 150을 낸다. 첫 곡일 때는 곡 교체 후 재생 버튼 대기와 라운드 축소, 다음 곡으로 cue해 둔 곡일 때는 cue 오류를 무시하고 차례가 오면 종료 처리. 둘 다 정상
-- 확인하지 못함: iOS 등 모바일에서 unMute 후 소리, 영상이 끝까지 재생된 뒤 추천 영상 화면(정답 공개 중에만 보일 수 있음), 오류 101·150 중 "임베드 금지" 영상의 실제 동작
+- 확인하지 못함: 가수 표시(정답 공개 화면, 곡 관리 목록·폼)를 실제 브라우저에서 눈으로 보지 않음(문법 검사와 저장·내보내기 테스트만), oEmbed 200이어도 실제 임베드 재생이 막힌 경우는 스크립트로 못 잡음, iOS 등 모바일에서 unMute 후 소리, 영상이 끝까지 재생된 뒤 추천 영상 화면(정답 공개 중에만 보일 수 있음), 오류 101·150 중 "임베드 금지" 영상의 실제 동작
 
 ## 멀티플레이 구현 현황 (feature 브랜치 claude/multiplayer-core-1e3c9b)
 
@@ -84,18 +86,18 @@
 - 완료(가짜 시계·소켓·플레이어 테스트까지): 방 상태 머신, 점수(SCORING.multi), 시계 오프셋, 재생 제어, 소켓 호스트 계층, Workers/Durable Object 어댑터
 - 완료(실제 확인): `wrangler dev`(로컬 workerd)에서 Node WebSocket 클라이언트 2개로 방 생성, 입장, ping/pong, 설정, 시작, ready, go(3초 뒤), 오답·정답, reveal, 끊김 후 토큰 재접속, 전원 퇴장 후 방 닫힘까지 한 라운드를 확인(2026-11-15). 스모크 스크립트는 저장소에 없다
 - 완료(실제 브라우저 확인, 2026-11-15): `npm run server:dev` + `python -m http.server`로 열고 브라우저 탭 2개에서 방 만들기, 초대 링크로 입장, 방장 설정이 상대에게 보임, 전체듣기 5라운드 진행(실제 YouTube 재생, 두 탭 재생 위치 일치, 공개 전 영상 가림), 오답·정답·점수·공개, 탭 새로고침 뒤 토큰으로 자동 복귀(점수 유지, 다음 라운드부터 합류), 최종 순위·한 판 더·나가기, 375px 폭 레이아웃
-- 미구현·미확인: 실제 Cloudflare 배포(계정·`wrangler login` 필요), `songs.json`의 `duration`(없으면 랜덤듣기 불가), 랜덤듣기·쉬움(객관식) 화면의 실제 브라우저 확인, 모바일 실기기·카카오톡 인앱 브라우저, 시작 신호 소리 시각 오차 측정, 백그라운드 탭 동작, 재접속 배너(`연결이 끊겼어요`) 실제 확인
+- 미구현·미확인: 실제 Cloudflare 배포(`wrangler login`은 완료), 랜덤듣기·쉬움(객관식) 화면의 실제 브라우저 확인, 모바일 실기기·카카오톡 인앱 브라우저, 시작 신호 소리 시각 오차 측정, 백그라운드 탭 동작, 재접속 배너(`연결이 끊겼어요`) 실제 확인
 - 실제 브라우저·기기로 확인하지 못함: 시작 신호 소리 시각 오차(브라우저 2개 이상에서 infoDelivery로 측정 필요), 모바일 자동 진행
-- 서버 규칙 중 코드에서 정한 것(문서에 없던 세부): 오류 과반(절반 초과) 판정은 준비 단계에서만 곡 교체, 시작 신호 뒤 오류는 그 사람만 제외. ready 시간 초과로 아무도 준비하지 못해도 곡 교체. 대기실에서도 끊기면 60초 유예 뒤 퇴장(새로고침 대비). 결과 화면에서 새 입장 허용. 랜덤듣기는 `duration`이 없는 곡을 제외(songs.json에 `duration`을 채워야 함). 시작 신호는 `go` 전송 3초 뒤. 전원 이탈 시 방은 유예(60초)가 끝나면 닫힘(`onClose`)
+- 서버 규칙 중 코드에서 정한 것(문서에 없던 세부): 오류 과반(절반 초과) 판정은 준비 단계에서만 곡 교체, 시작 신호 뒤 오류는 그 사람만 제외. ready 시간 초과로 아무도 준비하지 못해도 곡 교체. 대기실에서도 끊기면 60초 유예 뒤 퇴장(새로고침 대비). 결과 화면에서 새 입장 허용. 랜덤듣기는 `duration`이 없는 곡을 제외(songs.json 12곡은 `duration`이 채워져 있음). 시작 신호는 `go` 전송 3초 뒤. 전원 이탈 시 방은 유예(60초)가 끝나면 닫힘(`onClose`)
 - 프로토콜: 클라이언트 `join/settings/start/ready/answer/pass/playerError/ping/leave`, 서버 `joined/state/prepare/go/locked/answerResult/rateLimited/reveal/gameOver/notice/error/pong/kicked`. 주의: 문서의 메시지 표에 없던 `joined`(토큰 전달), `answerResult`(본인에게만 오답 결과), `rateLimited`, `notice`, `pong`, `kicked`, `leave`를 추가했다. `reveal`에 `nextVideoId`가 있어 다음 곡을 cue한다
 
 ## 다음 작업 후보 (기획서 개발 단계)
 
 1. (데스크톱 점검 완료) 모바일, 특히 iOS Safari에서 소리와 재생 흐름 확인. 곡별 `hookStart`(후렴 시작 초) 채우기
 2. 난이도, 구간 길이, 별칭 매칭 다듬기
-3. 곡 등록 도구 보강(목록 정기 점검, 삭제·차단된 영상 정리)
+3. 곡 등록 도구 보강: 점검 스크립트와 가수 필드 완료. 남은 것: 점검 결과로 삭제·차단된 영상 정리(자동 비활성화 등), 정기 점검 방식
 4. 확장 모드(작품명 맞추기, 서바이벌, 타임어택)
-5. 친구와 대결 이어서(위 멀티 구현 현황 참고): `songs.json`에 `duration` 채우기 → 랜덤듣기·쉬움 확인 → 실기기 동기화 측정 → Cloudflare 배포 후 `js/online/config.js`의 `DEFAULT_SERVER_URL`과 `wrangler.toml`의 `ALLOWED_ORIGINS` 채우기
+5. 친구와 대결 이어서(위 멀티 구현 현황 참고): 랜덤듣기·쉬움 확인 → 실기기 동기화 측정 → Cloudflare 배포 후 `js/online/config.js`의 `DEFAULT_SERVER_URL`과 `wrangler.toml`의 `ALLOWED_ORIGINS` 채우기
 
 ## 미결정 사항
 
