@@ -23,9 +23,10 @@ export class OnlineSession {
     this.go = null; // go 메시지
     this.reveal = null; // reveal 메시지(공개 뒤)
     this.gameOver = null;
-    this.lockedIds = new Set(); // 이번 라운드에 오답 소진·포기한 사람
+    this.lockedIds = new Set(); // 이번 라운드에 정답·오답 소진·포기한 사람
     this.attemptsLeft = SCORING.maxWrongAttempts;
-    this.feedback = null; // 'wrong' | 'rate' | null
+    this.myCorrect = null; // 이번 라운드에 내가 맞혔을 때 {points, elapsed, order}
+    this.feedback = null; // 'correct' | 'wrong' | 'rate' | null
     this.wrongChoices = new Set(); // 객관식에서 이미 틀린 보기 번호
     this.lastChoice = null;
     this.feedbackAt = 0;
@@ -69,7 +70,10 @@ export class OnlineSession {
         if (this.round?.roundId === message.roundId) this.lockedIds.add(message.playerId);
         break;
       case 'answerResult':
-        if (this.round?.roundId === message.roundId) {
+        if (this.round?.roundId === message.roundId && message.correct) {
+          this.myCorrect = { points: message.points, elapsed: message.elapsed, order: message.order };
+          this.setFeedback('correct');
+        } else if (this.round?.roundId === message.roundId) {
           this.attemptsLeft = message.attemptsLeft;
           if (this.lastChoice != null) this.wrongChoices.add(this.lastChoice);
           this.setFeedback('wrong');
@@ -107,6 +111,7 @@ export class OnlineSession {
     this.reveal = null;
     this.lockedIds = new Set();
     this.attemptsLeft = SCORING.maxWrongAttempts;
+    this.myCorrect = null;
     this.feedback = null;
     this.wrongChoices = new Set();
     this.lastChoice = null;
@@ -130,9 +135,9 @@ export class OnlineSession {
     return this.room?.phase ?? null;
   }
 
-  /** 지금 정답을 낼 수 있는지(시작 신호 시각이 지났고, 공개 전이고, 나는 포기·소진·제외되지 않음) */
+  /** 지금 정답을 낼 수 있는지(시작 신호 시각이 지났고, 공개 전이고, 나는 정답·포기·소진·제외되지 않음) */
   get canAnswer() {
-    if (!this.round || this.reveal || !this.go) return false;
+    if (!this.round || this.reveal || !this.go || this.myCorrect) return false;
     if (this.clock.serverNow() < this.go.startAt) return false;
     return this.me?.status === 'ready';
   }

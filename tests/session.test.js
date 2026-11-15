@@ -77,8 +77,8 @@ test('prepare·go·reveal은 재생 제어에 전달하고 라운드 상태를 �
   assert.deepEqual(env.playbackCalls, ['prepare', 'go']);
   assert.equal(env.session.round.roundId, 3);
   assert.equal(env.session.go.roundId, 3);
-  env.receive({ type: 'reveal', roundId: 3, winnerId: 'p1', song: { title: 'T' } });
-  assert.equal(env.session.reveal.winnerId, 'p1');
+  env.receive({ type: 'reveal', roundId: 3, correctPlayers: [{ playerId: 'p1' }], song: { title: 'T' } });
+  assert.equal(env.session.reveal.correctPlayers[0].playerId, 'p1');
   assert.deepEqual(env.playbackCalls, ['prepare', 'go', 'reveal']);
 });
 
@@ -87,7 +87,7 @@ test('새 prepare는 이전 라운드의 잠금·기회·공개를 초기화', (
   inRound(env);
   env.receive({ type: 'locked', roundId: 3, playerId: 'p1', reason: 'pass' });
   env.receive({ type: 'answerResult', roundId: 3, correct: false, attemptsLeft: 1 });
-  env.receive({ type: 'reveal', roundId: 3, winnerId: null });
+  env.receive({ type: 'reveal', roundId: 3, correctPlayers: [] });
   assert.ok(env.session.lockedIds.has('p1'));
   assert.equal(env.session.attemptsLeft, 1);
   env.receive({ type: 'prepare', roundId: 4, index: 1, total: 5, mode: 'random', videoId: 'w', segmentStart: 1, clipLength: 5, choices: null });
@@ -103,7 +103,7 @@ test('다른 라운드의 locked·answerResult·reveal은 무시', () => {
   inRound(env);
   env.receive({ type: 'locked', roundId: 2, playerId: 'p1', reason: 'pass' });
   env.receive({ type: 'answerResult', roundId: 2, correct: false, attemptsLeft: 0 });
-  env.receive({ type: 'reveal', roundId: 2, winnerId: 'p1' });
+  env.receive({ type: 'reveal', roundId: 2, correctPlayers: [] });
   assert.equal(env.session.lockedIds.size, 0);
   assert.equal(env.session.attemptsLeft, 3);
   assert.equal(env.session.reveal, null);
@@ -124,8 +124,32 @@ test('canAnswer: 시작 신호 시각 전·공개 뒤·잠긴 뒤에는 불가',
   assert.equal(env.session.canAnswer, false);
   env.receive(roomState('answering', [player('p1', { status: 'ready' }), player('p2', { status: 'ready' })]));
   assert.equal(env.session.canAnswer, true);
-  env.receive({ type: 'reveal', roundId: 3, winnerId: 'p1' });
+  env.receive({ type: 'reveal', roundId: 3, correctPlayers: [] });
   assert.equal(env.session.canAnswer, false);
+});
+
+test('내 정답: 점수·시간을 보관하고 더는 답할 수 없다, 다음 라운드에 초기화', () => {
+  const env = setup();
+  inRound(env);
+  env.setNow(104_000);
+  assert.equal(env.session.submitText('정답'), true);
+  env.receive({ type: 'answerResult', roundId: 3, correct: true, points: 140, elapsed: 4, order: 1 });
+  assert.deepEqual(env.session.myCorrect, { points: 140, elapsed: 4, order: 1 });
+  assert.equal(env.session.feedback, 'correct');
+  assert.equal(env.session.attemptsLeft, 3, '정답은 기회를 깎지 않는다');
+  // state의 status가 아직 ready여도 다시 보내지 않는다
+  assert.equal(env.session.canAnswer, false);
+  assert.equal(env.session.submitText('또'), false);
+  assert.equal(env.session.pass(), false);
+  env.receive({ type: 'prepare', roundId: 4, index: 1, total: 5, mode: 'random', videoId: 'w', segmentStart: 1, clipLength: 5, choices: null });
+  assert.equal(env.session.myCorrect, null);
+});
+
+test('다른 라운드의 정답 결과는 무시', () => {
+  const env = setup();
+  inRound(env);
+  env.receive({ type: 'answerResult', roundId: 2, correct: true, points: 100, elapsed: 1, order: 1 });
+  assert.equal(env.session.myCorrect, null);
 });
 
 test('제외된 사람(error/timeout/absent)은 답할 수 없다', () => {

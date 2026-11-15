@@ -52,6 +52,14 @@ export function createEnv({ songCount = 6, songs = null, config = {}, seed = 7, 
     songOf: (videoId) => list.find((s) => s.videoId === videoId),
     answer: (conn, text) => room.handleMessage(conn, { type: 'answer', roundId: env.round().id, text }),
     correctText: () => env.round().song.title,
+    /** 아직 답할 수 있는(ready) 사람을 모두 패스시킨다 → 남은 사람이 없어 라운드 종료 */
+    passRest: () => {
+      for (const p of room.connectedMembers) {
+        if (room.round?.players.get(p.id)?.status === 'ready') room.handleMessage(p.connId, { type: 'pass', roundId: room.round.id });
+      }
+    },
+    /** reveal·history 기록의 정답자 닉네임(처리 순서) */
+    correctNames: (record) => record.correctPlayers.map((c) => c.nickname),
     /** 시작 → 전원 ready → 시작 신호 시각 지남 */
     begin: () => {
       room.handleMessage(room.members[0].connId, { type: 'start' });

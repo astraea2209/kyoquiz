@@ -121,6 +121,11 @@ legend { color: var(--muted); font-size: 0.9rem; margin-bottom: 6px; }
 
 /* 게임 화면 */
 .game-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.volume-row { margin: 0 0 12px; }
+.settings .volume-row { margin: 4px 0 0; }
+.volume-control { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; color: var(--muted); }
+.volume-control input[type='range'] { flex: 1; min-width: 0; accent-color: var(--accent); }
+.volume-value { min-width: 3.2em; text-align: right; font-variant-numeric: tabular-nums; }
 .pill { padding: 4px 10px; border-radius: 999px; background: var(--panel-2); font-size: 0.9rem; }
 .pill.muted { color: var(--muted); }
 .score { margin-left: auto; font-weight: 700; font-size: 1.1rem; }

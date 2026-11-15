@@ -56,6 +56,7 @@ export async function createYouTubePlayer(element, { width = 320, height = 240 }
   const stateHandlers = new Set();
   const errorHandlers = new Set();
 
+  let volume = null; // setVolume으로 정한 값. unMute 때 다시 적용한다
   const yt = await new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('플레이어 준비 시간 초과')), 15000);
     const instance = new YT.Player(element, {
@@ -100,7 +101,15 @@ export async function createYouTubePlayer(element, { width = 320, height = 240 }
     getCurrentTime: () => yt.getCurrentTime?.() ?? 0,
     getDuration: () => yt.getDuration?.() ?? 0,
     mute: () => yt.mute(),
-    unMute: () => yt.unMute(),
+    unMute: () => {
+      if (volume != null) yt.setVolume(volume);
+      yt.unMute();
+    },
+    /** 0~100 */
+    setVolume: (value) => {
+      volume = value;
+      yt.setVolume(value);
+    },
     onStateChange: (fn) => {
       stateHandlers.add(fn);
       return () => stateHandlers.delete(fn);

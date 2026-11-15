@@ -58,6 +58,13 @@
           <label><input type="radio" name="difficulty" value="hard" /><span>어려움</span></label>
         </fieldset>
         <p class="hint" id="difficulty-hint"></p>
+        <div class="volume-row">
+          <label class="volume-control">
+            <span class="volume-label">볼륨</span>
+            <input type="range" min="0" max="100" step="1" data-volume aria-label="노래 볼륨" />
+            <span class="volume-value" aria-hidden="true"></span>
+          </label>
+        </div>
       </div>
 
       <p class="status" id="song-count"></p>
@@ -76,6 +83,13 @@
         <span id="mode-label" class="pill muted"></span>
         <span id="score-label" class="score">0점</span>
         <button type="button" class="btn small ghost" id="quit-btn">그만하기</button>
+      </div>
+      <div class="volume-row">
+        <label class="volume-control">
+          <span class="volume-label">볼륨</span>
+          <input type="range" min="0" max="100" step="1" data-volume aria-label="노래 볼륨" />
+          <span class="volume-value" aria-hidden="true"></span>
+        </label>
       </div>
 
       <div class="stage" id="stage">
