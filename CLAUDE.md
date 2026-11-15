@@ -35,7 +35,7 @@
 - `js/segment.js`: 랜덤듣기 구간 선택(앞뒤 10% 제외, hookStart ±5초 우선)
 - `js/linkParser.js`: YouTube 링크에서 videoId와 `t=` 시작 시간 추출
 - `js/songs.js`: 곡 스키마, songs.json과 localStorage 병합, 영상 길이 캐시, 최고 점수, 설정 저장. 곡 필드: id, videoId, title, titleAliases, anime{name, aliases}, artist(선택, 표시만 하고 정답 인정 안 함), type, hookStart·skipStart·skipEnd·duration(선택, 초), enabled
-- `songs.json`: 기본 곡 목록(유명 애니 OP 12곡, 공식 채널 영상 위주). 제목은 한국어 표기, 원제·로마자·영어는 별칭. 가수는 한국어 표기가 있으면 한국어(예: 요네즈 켄시), 영문·원어 활동명은 그대로(예: YOASOBI, TK from 凛として時雨). `duration`은 점검 스크립트 `--write`로 채움(있으면 게임이 길이 측정용 음소거 로드를 건너뜀). `hookStart`는 아직 없음. `songs.sample.json`: 형식 예시(자리표시자 값)
+- `songs.json`: 기본 곡 목록(유명 애니 OP 12곡 + 블리치 OP·ED 15곡, 공식 채널 영상 위주. 블리치 ほうき星 영상은 14분짜리라 `enabled:false`). 제목은 한국어 표기, 원제·로마자·영어는 별칭. 가수는 한국어 표기가 있으면 한국어(예: 요네즈 켄시), 영문·원어 활동명은 그대로(예: YOASOBI, TK from 凛として時雨). `duration`은 점검 스크립트 `--write`로 채움(있으면 게임이 길이 측정용 음소거 로드를 건너뜀). `hookStart`는 아직 없음. `songs.sample.json`: 형식 예시(자리표시자 값)
 - `tools/check-songs.mjs`: songs.json 점검(oEmbed로 존재·임베드 가능 여부와 채널명, watch 페이지 `lengthSeconds`로 길이, duration 차이, id·videoId 중복). 순수 함수는 export해 `tests/checkSongs.test.js`에서 네트워크 없이 테스트
 - `tests/`: 단위 테스트 파일 15개(가짜 플레이어·시계·타이머·소켓 포함)
 - 멀티플레이(친구와 대결, 선착순) 핵심부. 설계는 Claude Docs 문서 "애니송 맞추기 멀티플레이 기획서"(https://claude.ai/artifact/3BLyVFbGYGhL7hk2pjG7SM). 서버 런타임과 멀티 화면에 의존하지 않는 부분만 구현됨:

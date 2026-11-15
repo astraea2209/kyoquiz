@@ -130,5 +130,170 @@
     "type": "OP",
     "duration": 267,
     "enabled": true
+  },
+  {
+    "id": "bleach-tybw4-op",
+    "videoId": "9idm6v9jNbg",
+    "title": "I-BULL",
+    "titleAliases": ["이불", "아이불", "いぶる", "イブル"],
+    "anime": { "name": "블리치", "aliases": ["블리치 천년혈전편 금진담", "천년혈전편", "ブリーチ", "BLEACH", "BLEACH 千年血戦篇-禍進譚-"] },
+    "artist": "jo0ji",
+    "type": "OP",
+    "duration": 90,
+    "enabled": true
+  },
+  {
+    "id": "bleach-tybw4-ed",
+    "videoId": "E2c3V6nxjCw",
+    "title": "나선",
+    "titleAliases": ["螺旋", "Rasen"],
+    "anime": { "name": "블리치", "aliases": ["블리치 천년혈전편 금진담", "천년혈전편", "ブリーチ", "BLEACH", "BLEACH 千年血戦篇-禍進譚-"] },
+    "artist": "9Lana",
+    "type": "ED",
+    "duration": 90,
+    "enabled": true
+  },
+  {
+    "id": "bleach-tybw2-ed",
+    "videoId": "lYKPh-WUCJ0",
+    "title": "Endroll",
+    "titleAliases": ["엔드롤"],
+    "anime": { "name": "블리치", "aliases": ["블리치 천년혈전편 결별담", "천년혈전편", "ブリーチ", "BLEACH", "BLEACH 千年血戦篇-訣別譚-"] },
+    "artist": "카미야마 요",
+    "type": "ED",
+    "duration": 90,
+    "enabled": true
+  },
+  {
+    "id": "bleach-tybw1-ed",
+    "videoId": "ywy8yatiwQs",
+    "title": "사이하테",
+    "titleAliases": ["최果て", "最果て", "Saihate"],
+    "anime": { "name": "블리치", "aliases": ["블리치 천년혈전편", "천년혈전편", "ブリーチ", "BLEACH", "BLEACH 千年血戦篇"] },
+    "artist": "SennaRin",
+    "type": "ED",
+    "duration": 181,
+    "enabled": true
+  },
+  {
+    "id": "bleach-tybw1-op",
+    "videoId": "FEn8A5uxK24",
+    "title": "Scar",
+    "titleAliases": ["스카", "スカー"],
+    "anime": { "name": "블리치", "aliases": ["블리치 천년혈전편", "천년혈전편", "ブリーチ", "BLEACH", "BLEACH 千年血戦篇"] },
+    "artist": "키타니 타츠야",
+    "type": "OP",
+    "duration": 90,
+    "enabled": true
+  },
+  {
+    "id": "bleach-ed1",
+    "videoId": "LIZOJwuG12U",
+    "title": "Life is Like a Boat",
+    "titleAliases": ["라이프 이즈 라이크 어 보트"],
+    "anime": { "name": "블리치", "aliases": ["ブリーチ", "BLEACH"] },
+    "artist": "Rie fu",
+    "type": "ED",
+    "duration": 64,
+    "enabled": true
+  },
+  {
+    "id": "bleach-op1",
+    "videoId": "iqCu1cnJTjU",
+    "title": "아스타리스크",
+    "titleAliases": ["＊〜アスタリスク〜", "アスタリスク", "Asterisk"],
+    "anime": { "name": "블리치", "aliases": ["ブリーチ", "BLEACH"] },
+    "artist": "ORANGE RANGE",
+    "type": "OP",
+    "duration": 90,
+    "enabled": true
+  },
+  {
+    "id": "bleach-ed2",
+    "videoId": "lQmWnU-pXWk",
+    "title": "땡큐!!",
+    "titleAliases": ["サンキュー!!", "サンキュー", "Thank You", "산큐"],
+    "anime": { "name": "블리치", "aliases": ["ブリーチ", "BLEACH"] },
+    "artist": "HOME MADE 家族",
+    "type": "ED",
+    "duration": 66,
+    "enabled": true
+  },
+  {
+    "id": "bleach-op2",
+    "videoId": "8XkiWX48nds",
+    "title": "D-tecnoLife",
+    "titleAliases": ["디 테크노 라이프", "디테크노라이프"],
+    "anime": { "name": "블리치", "aliases": ["ブリーチ", "BLEACH"] },
+    "artist": "UVERworld",
+    "type": "OP",
+    "duration": 91,
+    "enabled": true
+  },
+  {
+    "id": "bleach-ed3",
+    "videoId": "mfAN2jndXkM",
+    "title": "혜성",
+    "titleAliases": ["ほうき星", "호우키보시", "Houkiboshi"],
+    "anime": { "name": "블리치", "aliases": ["ブリーチ", "BLEACH"] },
+    "artist": "ユンナ",
+    "type": "ED",
+    "duration": 850,
+    "enabled": false
+  },
+  {
+    "id": "bleach-ed4",
+    "videoId": "6Av4gzVk4rw",
+    "title": "happypeople",
+    "titleAliases": ["해피피플", "해피 피플", "Happy People"],
+    "anime": { "name": "블리치", "aliases": ["ブリーチ", "BLEACH"] },
+    "artist": "Skoop On Somebody",
+    "type": "ED",
+    "duration": 71,
+    "enabled": true
+  },
+  {
+    "id": "bleach-op3",
+    "videoId": "km1CEwOaXsg",
+    "title": "한 송이의 꽃",
+    "titleAliases": ["一輪の花", "이치린노하나", "Ichirin no Hana"],
+    "anime": { "name": "블리치", "aliases": ["ブリーチ", "BLEACH"] },
+    "artist": "HIGH and MIGHTY COLOR",
+    "type": "OP",
+    "duration": 96,
+    "enabled": true
+  },
+  {
+    "id": "bleach-ed5",
+    "videoId": "eDh5Pyn1_fw",
+    "title": "LIFE",
+    "titleAliases": ["라이프"],
+    "anime": { "name": "블리치", "aliases": ["ブリーチ", "BLEACH"] },
+    "artist": "YUI",
+    "type": "ED",
+    "duration": 90,
+    "enabled": true
+  },
+  {
+    "id": "bleach-ed6",
+    "videoId": "nUhQW57VE0Y",
+    "title": "마이 페이스",
+    "titleAliases": ["マイペース", "마이페이스", "My Pace"],
+    "anime": { "name": "블리치", "aliases": ["ブリーチ", "BLEACH"] },
+    "artist": "SunSet Swish",
+    "type": "ED",
+    "duration": 96,
+    "enabled": true
+  },
+  {
+    "id": "bleach-op4",
+    "videoId": "l_6pmz70Emw",
+    "title": "TONIGHT, TONIGHT, TONIGHT",
+    "titleAliases": ["투나잇 투나잇 투나잇", "투나이트 투나이트 투나이트"],
+    "anime": { "name": "블리치", "aliases": ["ブリーチ", "BLEACH"] },
+    "artist": "BEAT CRUSADERS",
+    "type": "OP",
+    "duration": 96,
+    "enabled": true
   }
 ]
