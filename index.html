@@ -167,8 +167,7 @@
         <label>가수 별칭 (선택, 쉼표로 구분) <input name="artistAliases" /></label>
         <label>작품명 (선택) <input name="animeName" /></label>
         <label>작품 별칭 (선택, 쉼표로 구분) <input name="animeAliases" /></label>
-        <div class="row">
-          <label>종류
+        <label>종류
             <select name="type">
               <option value="" title="작품명이 있으면 OP, 없으면 일반곡">자동</option>
               <option value="OP">OP</option>
@@ -179,9 +178,12 @@
               <option value="일반곡">일반곡</option>
               <option value="기타">기타</option>
             </select>
-          </label>
+        </label>
+        <div class="row">
+          <label>곡 길이 (선택) <input name="duration" placeholder="예: 3:45 또는 225" inputmode="numeric" /></label>
           <label>hookStart (초, 선택) <input name="hookStart" type="number" min="0" step="1" inputmode="numeric" /></label>
         </div>
+        <p class="hint">곡 길이는 영상 전체 길이예요. 모르면 비워 두면 게임이 처음 재생할 때 재요.</p>
         <button type="submit" class="btn primary">곡 추가</button>
       </form>
 
@@ -195,7 +197,8 @@
 
       <h2>내보내기 · 가져오기</h2>
       <div class="actions">
-        <button type="button" class="btn" id="export-btn">JSON 내보내기</button>
+        <button type="button" class="btn" id="export-mine-btn" title="이 브라우저에서 직접 추가한 곡만 파일로 내보냅니다">내 곡만 내보내기</button>
+        <button type="button" class="btn" id="export-btn">전체 JSON 내보내기</button>
         <label class="btn file-btn">JSON 파일 가져오기<input type="file" id="import-file" accept="application/json,.json" hidden /></label>
       </div>
       <textarea id="import-text" rows="5" placeholder="JSON을 붙여넣고 아래 버튼을 누르세요"></textarea>

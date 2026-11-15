@@ -28,6 +28,25 @@ const optionalSeconds = (value) => {
   return Number.isFinite(n) && n >= 0 ? n : undefined;
 };
 
+/**
+ * 곡 길이 입력 → 초. "225", "3:45", "1:02:03"(시:분:초) 모두 받는다. 전각 콜론도 허용.
+ * 빈 값이면 undefined, 형식이 틀리거나 0 이하면 null.
+ */
+export function parseDurationText(text) {
+  const t = String(text ?? '').trim().replace(/：/g, ':');
+  if (!t) return undefined;
+  if (/^\d+(\.\d+)?$/.test(t)) {
+    const n = Number(t);
+    return n > 0 ? n : null;
+  }
+  const m = /^(?:(\d+):)?(\d+):(\d{1,2})$/.exec(t);
+  if (!m) return null;
+  const [h, min, sec] = [Number(m[1] ?? 0), Number(m[2]), Number(m[3])];
+  if (sec >= 60 || (m[1] != null && min >= 60)) return null;
+  const total = h * 3600 + min * 60 + sec;
+  return total > 0 ? total : null;
+}
+
 /** "a, b ,c" → ['a','b','c'] (쉼표·전각쉼표·읽기점 구분) */
 export function splitAliases(text) {
   return String(text ?? '')
@@ -205,9 +224,12 @@ export class SongStore {
     writeJson(this.storage, STORAGE_KEYS.enabled, overrides);
   }
 
-  exportJson() {
-    // eslint-disable-next-line no-unused-vars
-    const songs = this.all().map(({ source, ...rest }) => rest);
+  /** 곡 목록 JSON. userOnly면 이 브라우저에서 직접 추가한 곡만(songs.json 곡을 고쳐 다시 추가한 것 포함) */
+  exportJson({ userOnly = false } = {}) {
+    const songs = this.all()
+      .filter((s) => !userOnly || s.source === 'user')
+      // eslint-disable-next-line no-unused-vars
+      .map(({ source, ...rest }) => rest);
     return JSON.stringify(songs, null, 2);
   }
 

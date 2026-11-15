@@ -124,6 +124,7 @@ js/main.js          진입점
 songs.json          기본 곡 목록(빈 배열)
 songs.sample.json   형식 예시(자리표시자)
 tools/check-songs.mjs  songs.json 점검(영상 존재·임베드 가능, 길이, 중복)
+tools/merge-songs.mjs  친구들이 보낸 곡 JSON을 songs.json에 합치기(없는 영상만 추가)
 tests/              node --test 테스트와 가짜 플레이어(helpers.js)
 ```
 
@@ -153,6 +154,19 @@ node tools/check-songs.mjs --write   # duration이 없거나 2초 넘게 틀린 
 ```
 
 인터넷이 필요합니다. YouTube oEmbed 응답 코드로 영상 존재·임베드 가능 여부를(401·403 임베드 금지, 400·404 없음), watch 페이지의 `lengthSeconds`로 길이를 확인하고, `duration` 차이와 `id`·`videoId` 중복을 검사합니다. 곡마다 한 줄씩 정상/경고/문제를 출력하고 마지막에 요약합니다. 문제가 있으면 종료 코드 1입니다.
+
+### 친구들이 보낸 곡 합치기
+
+1. 친구가 곡 관리에서 곡을 등록하고 **내 곡만 내보내기**를 눌러 `my-songs.json`을 보내 줍니다(그 브라우저에서 직접 추가한 곡만 들어 있음).
+2. 받은 파일을 합칩니다.
+
+```bash
+node tools/merge-songs.mjs 친구1.json 친구2.json           # 무엇이 추가될지 보기만 함
+node tools/merge-songs.mjs 친구1.json 친구2.json --write   # songs.json 끝에 새 곡 추가
+node tools/check-songs.mjs --write                          # 영상 점검, 길이 채우기
+```
+
+songs.json에 없는 영상만 추가하고 이미 있는 곡은 바꾸지 않습니다(내용이 다르면 다른 항목만 알려 줌). 여러 파일에 같은 영상이 있으면 먼저 쓴 파일의 곡을 쓰고, 형식이 틀린 항목은 건너뜁니다. 다른 파일에 합치려면 `--into 경로.json`.
 
 `game.js`는 플레이어를 인터페이스로 주입받으므로, 테스트에서는 `tests/helpers.js`의 `FakePlayer`로 재생 상태, 오류, 시간 흐름을 흉내 냅니다.
 

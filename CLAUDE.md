@@ -7,6 +7,7 @@
 - 실행: 이 폴더에서 `python -m http.server 8000` 후 http://localhost:8000 (Windows에서 python이 안 되면 `py -m http.server 8000` 또는 VS Code Live Server)
 - 테스트: `node --test` (또는 `npm test`). 의존성 설치 없음
 - 곡 점검: `node tools/check-songs.mjs` (또는 `npm run check-songs`). 곡마다 한 줄(정상/경고/문제)과 요약만 출력, 문제가 있으면 exit 1. `--write`는 `duration`이 없거나 2초 넘게 틀린 곡을 실제 길이로 고쳐 저장(필드 순서·형식 유지). 곡 확인은 YouTube 검색 HTML을 직접 받지 말고 이 스크립트로 한다(토큰 절약)
+- 곡 합치기: `node tools/merge-songs.mjs 친구1.json [친구2.json ...] [--into songs.json] [--write]`. 친구가 곡 관리의 "내 곡만 내보내기"로 보낸 파일에서 songs.json에 없는 videoId만 끝에 추가(기존 곡은 안 바꾸고 다른 필드만 보고, 파일끼리 중복은 앞 파일 우선, id 충돌은 videoId로 바꿈). 기본은 보기만, `--write`로 저장. 합친 뒤 `check-songs --write`
 - git: 기본 브랜치 `main`. 작성자 정보는 이 저장소 로컬 설정에만 있다(전역 설정 없음)
 - `index.html`을 file://로 열면 안 된다. YouTube 임베드가 오류 153 등으로 실패하고 songs.json도 못 불러온다. 반드시 http로 서빙
 
@@ -37,8 +38,9 @@
 - `js/volume.js`: 노래 볼륨(0~100, 기본 80, localStorage `asq.volume`). `VolumeControl`이 개인전·친구와 대결 플레이어 모두에 `setVolume`을 적용하고, 슬라이더(시작 화면, 개인전 게임, 대기실, 대결 게임)는 `bindVolumeInput`으로 같은 값을 공유한다. `js/player.js`는 `unMute` 때 볼륨을 다시 적용한다
 - `js/songs.js`: 곡 스키마(애니송과 일반 노래 공용), songs.json과 localStorage 병합, 영상 길이 캐시, 최고 점수, 설정 저장. 곡 필드: id, videoId, title(유일한 필수값), titleAliases, anime{name, aliases}(선택, 일반 노래는 필드 자체가 없음), artist·artistAliases(선택, 표시·저장만 하고 정답 인정 안 함), type(`SONG_TYPES`: OP, ED, 삽입곡, OST, 캐릭터송, 일반곡, 기타. 비우면 작품이 있으면 OP, 없으면 일반곡), hookStart·skipStart·skipEnd·duration(선택, 초), enabled. 화면에서 `song.anime`은 없을 수 있으니 `?.`로 읽는다
 - `songs.json`: 기본 곡 목록(유명 애니 OP 12곡 + 블리치 OP·ED 15곡, 공식 채널 영상 위주. 블리치 ほうき星 영상은 14분짜리라 `enabled:false`). 제목은 한국어 표기, 원제·로마자·영어는 별칭. 가수는 한국어 표기가 있으면 한국어(예: 요네즈 켄시), 영문·원어 활동명은 그대로(예: YOASOBI, TK from 凛として時雨). `duration`은 점검 스크립트 `--write`로 채움(있으면 게임이 길이 측정용 음소거 로드를 건너뜀). `hookStart`는 아직 없음. `songs.sample.json`: 형식 예시(자리표시자 값)
-- `tools/check-songs.mjs`: songs.json 점검(oEmbed로 존재·임베드 가능 여부와 채널명, watch 페이지 `lengthSeconds`로 길이, duration 차이, id·videoId 중복). 순수 함수는 export해 `tests/checkSongs.test.js`에서 네트워크 없이 테스트
-- `tests/`: 단위 테스트 파일 16개(가짜 플레이어·시계·타이머·소켓 포함)
+- `tools/check-songs.mjs`: songs.json 점검(oEmbed로 존재·임베드 가능 여부와 채널명, watch 페이지 `lengthSeconds`로 길이, duration 차이, id·videoId 중복). 순수 함수는 export해 `tests/checkSongs.test.js`에서 네트워크 없이 테스트. `formatSongsJson`은 `tools/merge-songs.mjs`도 쓴다
+- `tools/merge-songs.mjs`: 곡 JSON 합치기(`mergeSongLists`, `orderSongFields`, `diffFields`). 테스트는 `tests/mergeSongs.test.js`
+- `tests/`: 단위 테스트 파일 17개(가짜 플레이어·시계·타이머·소켓 포함)
 - 멀티플레이(친구와 대결, 속도 점수) 핵심부. 설계는 Claude Docs 문서 "애니송 맞추기 멀티플레이 기획서"(https://claude.ai/artifact/3BLyVFbGYGhL7hk2pjG7SM). 서버 런타임과 멀티 화면에 의존하지 않는 부분만 구현됨:
   - `server/room.js`: `Room` 방 상태 머신(대기실→준비→시작 대기→답변→공개→결과). 라운드는 첫 정답에 끝나지 않고, 전원이 정답·포기·오답 소진(또는 제외)되거나 답변 시간이 끝날 때 중 먼저 오는 쪽에서 공개한다. 정답자는 모두 각자 도착 시간에 따른 점수(`scoreMulti`)를 받고, 점수는 공개 때 반영한다. 시계(`now`), 난수(`rng`), 타이머(`timers`), 전송(`send(connId, msg)`), 토큰 생성(`genToken`)을 주입받는다. 어댑터는 `handleMessage(connId, msg)`와 `handleDisconnect(connId)`만 부르면 된다. 판정·구간 선택·점수는 `js/judge.js`, `js/segment.js`, `js/scoring.js`를 그대로 import. 시간·한도 상수는 `ROOM_CONFIG`(생성 때 `config`로 덮어쓰기)
   - `server/roomHost.js`: `RoomHost`. Room을 소켓({send, close})에 연결하는 런타임 무관 계층(JSON 파싱, 메시지 크기 2KB·빈도 40개/5초 제한, join 10초 제한, 빈 방 60초 뒤 닫기, 방이 닫히면 소켓 정리)
@@ -70,17 +72,17 @@
 - YouTube iframe은 200x200 이상으로 두고 오버레이로 가린다. 제목 표시줄과 종료 후 추천 영상이 정답을 노출하지 않아야 한다
 - YouTube가 iframe `title` 속성에 영상 제목을 넣는다. 그래서 `GameSession.isPlayerVisible(i)`가 false인 플레이어 칸(공개 전, 그리고 다음 곡을 cue해 둔 칸)은 `inert`로 접근성 트리에서 뺀다
 - 건너뛰는 오류 코드: 2, 5, 100, 101, 150, 153
-- 곡 관리 화면은 등록 폼, 등록된 곡 수(전체·사용 중), 곡 찾기, JSON 내보내기·가져오기로 되어 있다. 전체 목록은 보여 주지 않고, 곡 찾기(`searchSongs`: 제목·작품·가수·각 별칭·videoId 부분 일치, 정규화는 `normalizeAnswer`)에 검색어를 넣었을 때만 최대 20곡을 사용 토글·삭제 버튼과 함께 보여 준다. songs.json 곡 삭제는 그 브라우저에서만 숨겨진다(localStorage)
+- 곡 관리 화면은 등록 폼, 등록된 곡 수(전체·사용 중), 곡 찾기, JSON 내보내기(내 곡만 = `exportJson({userOnly: true})`, 전체)·가져오기로 되어 있다. 등록 폼의 곡 길이는 `parseDurationText`(초, 분:초, 시:분:초)로 읽어 `duration`에 넣는다(틀린 형식이면 저장 안 함, 비우면 게임이 재서 캐시). 전체 목록은 보여 주지 않고, 곡 찾기(`searchSongs`: 제목·작품·가수·각 별칭·videoId 부분 일치, 정규화는 `normalizeAnswer`)에 검색어를 넣었을 때만 최대 20곡을 사용 토글·삭제 버튼과 함께 보여 준다. songs.json 곡 삭제는 그 브라우저에서만 숨겨진다(localStorage)
 
 ## 검증 현황
 
-- 확인함: 단위 테스트 201개 통과(개인전·곡 점검·볼륨 76개 + 멀티 125개), 모든 JS 파일 `node --check` 통과, 가짜 YT 객체를 넣은 헤드리스 Chrome에서 곡 추가부터 결과 화면까지의 흐름, 실제 브라우저에서 YouTube 재생과 소리·영상(사용자 확인), songs.json 12곡 모두 localhost에서 임베드 재생 오류 없음(2026-11-15), `tools/check-songs.mjs`로 12곡 모두 정상(oEmbed 200, duration 채움, 2026-11-15)
+- 확인함: 단위 테스트 207개 통과(개인전·곡 점검·볼륨·곡 합치기 82개 + 멀티 125개), 모든 JS 파일 `node --check` 통과, 가짜 YT 객체를 넣은 헤드리스 Chrome에서 곡 추가부터 결과 화면까지의 흐름, 실제 브라우저에서 YouTube 재생과 소리·영상(사용자 확인), songs.json 12곡 모두 localhost에서 임베드 재생 오류 없음(2026-11-15), `tools/check-songs.mjs`로 12곡 모두 정상(oEmbed 200, duration 채움, 2026-11-15)
 - 실제 YouTube로 확인함(데스크톱 Chromium, 2026-11-15):
   - 0초 소리 누출 없음. iframe의 infoDelivery 메시지로 기록해 보니, 길이를 모르는 5곡 모두 0초 부근에서는 음소거였고 unMute는 구간 시작 위치에서만 일어났다. 3초 구간은 약 3.1초 재생
   - 오버레이는 공개 전까지 무대 전체를 가리고, 공개 때만 현재 플레이어가 보인다. controls=0이라 공개 중에도 제목 표시줄은 안 보임
   - 재생 오류: 존재하지 않는 videoId는 실제로 오류 150을 낸다. 첫 곡일 때는 곡 교체 후 재생 버튼 대기와 라운드 축소, 다음 곡으로 cue해 둔 곡일 때는 cue 오류를 무시하고 차례가 오면 종료 처리. 둘 다 정상
 - 볼륨(2026-11-15, 로컬 Chromium): 슬라이더 4개가 같은 값으로 움직이고 저장되며, 실제 YouTube 플레이어 2개의 `getVolume()`이 슬라이더 값과 일치. 375px 폭 시작·게임 화면 배치 확인. 귀로 듣는 확인과 iOS(iOS Safari는 JS 볼륨 조절을 무시함)는 못 함
-- 곡 등록(2026-11-16, 로컬 Chromium): 제목·가수·가수 별칭만 넣고 작품명 없이 추가하면 `type: 일반곡`, `anime` 없이 저장되고 곡 수가 1 늘어남. 곡 찾기로 검색(블리치 15곡, 가수명, 없는 곡 안내), 사용 끄기, 삭제(곡 수 감소, removedVideoIds 기록) 확인
+- 곡 등록(2026-11-16, 로컬 Chromium): 제목·가수·가수 별칭만 넣고 작품명 없이 추가하면 `type: 일반곡`, `anime` 없이 저장되고 곡 수가 1 늘어남. 곡 찾기로 검색(블리치 15곡, 가수명, 없는 곡 안내), 사용 끄기, 삭제(곡 수 감소, removedVideoIds 기록) 확인. 곡 길이 "3:32" → 212초 저장, "3분"은 거부, 내 곡만 내보내기(`my-songs.json`에 직접 추가한 곡만). `merge-songs`를 songs.json 복사본에 돌려 새 곡만 끝에 붙고 기존 줄은 그대로인 것 확인
 - 확인하지 못함: 작품명 없는 곡의 정답 공개·결과 화면 표시(작품명 대신 종류만, 결과 목록은 가수)를 실제 게임에서 보지 않음, 가수 표시(정답 공개 화면)를 실제 브라우저에서 눈으로 보지 않음, oEmbed 200이어도 실제 임베드 재생이 막힌 경우는 스크립트로 못 잡음, iOS 등 모바일에서 unMute 후 소리, 영상이 끝까지 재생된 뒤 추천 영상 화면(정답 공개 중에만 보일 수 있음), 오류 101·150 중 "임베드 금지" 영상의 실제 동작
 
 ## 멀티플레이 구현 현황 (feature 브랜치 claude/multiplayer-core-1e3c9b)
@@ -101,7 +103,7 @@
 
 1. (데스크톱 점검 완료) 모바일, 특히 iOS Safari에서 소리와 재생 흐름 확인. 곡별 `hookStart`(후렴 시작 초) 채우기
 2. 난이도, 구간 길이, 별칭 매칭 다듬기
-3. 곡 등록 도구 보강: 점검 스크립트, 가수·가수 별칭, 작품명 선택화, 종류 확장 완료. 곡 찾기로 사용 끄기·삭제 완료. 남은 것: 등록한 곡 수정(지금은 같은 링크로 다시 추가해 교체), 점검 결과로 삭제·차단된 영상 정리(자동 비활성화 등), 정기 점검 방식
+3. 곡 등록 도구 보강: 점검 스크립트, 가수·가수 별칭, 작품명 선택화, 종류 확장 완료. 곡 찾기로 사용 끄기·삭제, 곡 길이 입력, 내 곡만 내보내기와 합치기 스크립트 완료. 남은 것: 등록한 곡 수정(지금은 같은 링크로 다시 추가해 교체), 점검 결과로 삭제·차단된 영상 정리(자동 비활성화 등), 정기 점검 방식
 4. 확장 모드(작품명 맞추기, 서바이벌, 타임어택)
 5. 친구와 대결 이어서(위 멀티 구현 현황 참고): 랜덤듣기·쉬움 확인 → 실기기 동기화 측정 → 배포는 main을 push하면 Pages가 자동 갱신, 서버는 `npm run server:deploy`
 

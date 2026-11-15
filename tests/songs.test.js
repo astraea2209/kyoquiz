@@ -8,6 +8,7 @@ import {
   createMemoryStorage,
   mergeSongs,
   normalizeSong,
+  parseDurationText,
   parseSongList,
   searchSongs,
   splitAliases,
@@ -118,6 +119,32 @@ test('searchSongs: 제목·작품·가수·별칭·videoId 부분 일치, 공백
   const r = searchSongs(songs, 'yoasobi', 1);
   assert.equal(r.matches.length, 1);
   assert.equal(r.total, 2);
+});
+
+test('parseDurationText: 초, 분:초, 시:분:초', () => {
+  assert.equal(parseDurationText(''), undefined);
+  assert.equal(parseDurationText('  '), undefined);
+  assert.equal(parseDurationText('225'), 225);
+  assert.equal(parseDurationText('3:45'), 225);
+  assert.equal(parseDurationText(' 3：05 '), 185);
+  assert.equal(parseDurationText('1:02:03'), 3723);
+  assert.equal(parseDurationText('0'), null);
+  assert.equal(parseDurationText('0:00'), null);
+  assert.equal(parseDurationText('3:75'), null);
+  assert.equal(parseDurationText('1:60:00'), null);
+  assert.equal(parseDurationText('3분'), null);
+  assert.equal(parseDurationText('-5'), null);
+});
+
+test('exportJson({userOnly}): 직접 추가한 곡만 내보낸다', () => {
+  const store = new SongStore(createMemoryStorage(), [makeSong(1), makeSong(2)]);
+  store.add({ videoId: 'abcdefghijk', title: '내 곡', duration: 200 });
+  store.add({ ...makeSong(2), title: '고친 기본 곡' });
+  const mine = JSON.parse(store.exportJson({ userOnly: true }));
+  assert.deepEqual(mine.map((s) => s.title).sort(), ['고친 기본 곡', '내 곡'].sort());
+  assert.equal(mine.find((s) => s.title === '내 곡').duration, 200);
+  assert.ok(mine.every((s) => !('source' in s)));
+  assert.equal(JSON.parse(store.exportJson()).length, 3);
 });
 
 test('splitAliases', () => {

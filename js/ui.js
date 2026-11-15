@@ -4,7 +4,7 @@ import { GameSession, MODE, PHASE } from './game.js';
 import { DIFFICULTY } from './judge.js';
 import { parseYouTubeLink } from './linkParser.js';
 import { SCORING } from './scoring.js';
-import { loadSettings, saveSettings, searchSongs, splitAliases } from './songs.js';
+import { loadSettings, parseDurationText, saveSettings, searchSongs, splitAliases } from './songs.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -409,6 +409,11 @@ export class App {
         this.toast('YouTube 링크 또는 11자리 영상 ID를 입력해 주세요.');
         return;
       }
+      const duration = parseDurationText(f.duration.value);
+      if (duration === null) {
+        this.toast('곡 길이는 3:45 또는 225(초)처럼 입력해 주세요.');
+        return;
+      }
       const exists = this.store.all().some((s) => s.videoId === parsed.videoId);
       const song = this.store.add({
         videoId: parsed.videoId,
@@ -419,6 +424,7 @@ export class App {
         anime: { name: f.animeName.value, aliases: splitAliases(f.animeAliases.value) },
         type: f.type.value,
         hookStart: f.hookStart.value === '' ? undefined : Number(f.hookStart.value),
+        duration,
         enabled: true,
       });
       if (!song) {
@@ -435,15 +441,19 @@ export class App {
     $('#song-search').addEventListener('input', () => this.renderSearch());
 
     $('#export-btn').addEventListener('click', () => {
-      const json = this.store.exportJson();
-      $('#import-text').value = json;
-      const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
-      const a = el('a', { href: url, download: 'songs.json' });
-      document.body.append(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      this.toast('JSON을 내보냈습니다. 아래 입력란에도 복사해 두었습니다.');
+      this.downloadJson(this.store.exportJson(), 'songs.json', 'JSON을 내보냈습니다. 아래 입력란에도 복사해 두었습니다.');
+    });
+    $('#export-mine-btn').addEventListener('click', () => {
+      const count = this.store.all().filter((s) => s.source === 'user').length;
+      if (!count) {
+        this.toast('이 브라우저에서 직접 추가한 곡이 없습니다.');
+        return;
+      }
+      this.downloadJson(
+        this.store.exportJson({ userOnly: true }),
+        'my-songs.json',
+        `직접 추가한 ${count}곡을 내보냈습니다. 이 파일을 운영자에게 보내 주세요.`,
+      );
     });
 
     $('#import-file').addEventListener('change', async (event) => {
@@ -453,6 +463,18 @@ export class App {
       event.target.value = '';
     });
     $('#import-text-btn').addEventListener('click', () => this.importText($('#import-text').value));
+  }
+
+  /** JSON 파일로 내려받고, 아래 입력란에도 복사해 둔다 */
+  downloadJson(json, filename, message) {
+    $('#import-text').value = json;
+    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    const a = el('a', { href: url, download: filename });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    this.toast(message);
   }
 
   importText(text) {

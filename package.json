@@ -6,6 +6,7 @@
   "scripts": {
     "test": "node --test",
     "check-songs": "node tools/check-songs.mjs",
+    "merge-songs": "node tools/merge-songs.mjs",
     "server:dev": "npx wrangler dev",
     "server:deploy": "npx wrangler deploy"
   }
