@@ -1,0 +1,9 @@
+{
+  "name": "anime-song-quiz",
+  "private": true,
+  "type": "module",
+  "description": "애니송 맞추기 웹게임 프로토타입 (의존성 없음, 빌드 불필요)",
+  "scripts": {
+    "test": "node --test"
+  }
+}

@@ -1,0 +1,33 @@
+[
+  {
+    "id": "sample-1",
+    "videoId": "VIDEO_ID_1",
+    "title": "곡 제목 1",
+    "titleAliases": ["Song Title 1", "曲名1"],
+    "anime": { "name": "작품명 A", "aliases": ["Anime A", "作品A"] },
+    "type": "OP",
+    "hookStart": 45,
+    "enabled": true
+  },
+  {
+    "id": "sample-2",
+    "videoId": "VIDEO_ID_2",
+    "title": "곡 제목 2",
+    "titleAliases": [],
+    "anime": { "name": "작품명 B", "aliases": [] },
+    "type": "ED",
+    "skipStart": 8,
+    "skipEnd": 15,
+    "duration": 92,
+    "enabled": true
+  },
+  {
+    "id": "sample-3",
+    "videoId": "VIDEO_ID_3",
+    "title": "곡 제목 3",
+    "titleAliases": ["Insert Song 3"],
+    "anime": { "name": "작품명 C", "aliases": ["Anime C"] },
+    "type": "삽입곡",
+    "enabled": false
+  }
+]

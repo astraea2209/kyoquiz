@@ -1,0 +1,16 @@
+# 의존성(지금은 없지만 실수로 설치했을 때 대비)
+node_modules/
+
+# OS·에디터
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# 로그
+*.log
+npm-debug.log*
+
+# Claude Code 개인 설정(공유 설정 .claude/settings.json은 커밋)
+.claude/settings.local.json

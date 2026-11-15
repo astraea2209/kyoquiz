@@ -1,0 +1,235 @@
+:root {
+  --bg: #11131a;
+  --panel: #1b1e28;
+  --panel-2: #252937;
+  --text: #eef0f6;
+  --muted: #9aa0b4;
+  --accent: #6c8cff;
+  --accent-2: #9b6cff;
+  --ok: #3ecf8e;
+  --bad: #ff6b6b;
+  --warn: #ffb84d;
+  --radius: 12px;
+  --tap: 48px;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+}
+
+body { padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+
+h1 { font-size: 1.6rem; margin: 0.4em 0; }
+h2 { font-size: 1.15rem; margin: 1.2em 0 0.5em; }
+
+.screen {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px;
+}
+.screen[hidden] { display: none; }
+
+/* 게임 화면은 iframe 유지를 위해 화면 밖으로만 옮긴다(display:none 금지) */
+.keep-alive:not(.active) {
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  width: 640px;
+  pointer-events: none;
+}
+
+.app-header .sub, .status, .hint { color: var(--muted); }
+.hint { font-size: 0.9rem; margin: 0.3em 0; min-height: 1.2em; }
+
+.banner { padding: 12px 16px; border-radius: var(--radius); margin: 12px; }
+.banner.warn { background: #3a2a10; color: var(--warn); }
+.banner.info { background: var(--panel-2); margin: 12px 0; }
+
+/* 버튼 */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap);
+  padding: 0 18px;
+  border: 1px solid #3a3f52;
+  border-radius: var(--radius);
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.ghost { background: transparent; }
+.btn.big { min-height: 56px; font-size: 1.1rem; width: 100%; }
+.btn.small { min-height: 40px; padding: 0 12px; font-size: 0.9rem; }
+.btn.danger { color: var(--bad); }
+.file-btn { position: relative; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0; }
+.actions .btn { flex: 1 1 140px; }
+
+/* 시작 화면 */
+fieldset { border: 0; padding: 0; margin: 0 0 14px; }
+legend { color: var(--muted); font-size: 0.9rem; margin-bottom: 6px; }
+
+.mode-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mode-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+  border: 2px solid #2f3445;
+  border-radius: var(--radius);
+  background: var(--panel);
+  cursor: pointer;
+}
+.mode-card input { position: absolute; opacity: 0; pointer-events: none; }
+.mode-card:has(input:checked) { border-color: var(--accent); background: #1f2540; }
+.mode-card:has(input:focus-visible) { outline: 2px solid var(--accent); }
+.mode-title { font-weight: 700; font-size: 1.1rem; }
+.mode-desc { color: var(--muted); font-size: 0.85rem; }
+
+.segmented { display: flex; flex-wrap: wrap; gap: 6px; }
+.segmented legend { width: 100%; }
+.segmented label { flex: 1; }
+.segmented input { position: absolute; opacity: 0; pointer-events: none; }
+.segmented span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid #2f3445;
+  cursor: pointer;
+}
+.segmented input:checked + span { background: var(--accent); border-color: var(--accent); color: #fff; }
+.segmented input:focus-visible + span { outline: 2px solid var(--accent); }
+.segmented[disabled] { opacity: 0.4; }
+
+/* 게임 화면 */
+.game-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.pill { padding: 4px 10px; border-radius: 999px; background: var(--panel-2); font-size: 0.9rem; }
+.pill.muted { color: var(--muted); }
+.score { margin-left: auto; font-weight: 700; font-size: 1.1rem; }
+
+.stage {
+  position: relative;
+  width: 100%;
+  min-width: 200px;
+  min-height: 200px;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #000;
+}
+.player-slot { position: absolute; inset: 0; z-index: 1; }
+.player-slot.active { z-index: 2; }
+.player-slot iframe, .player-slot > div { width: 100%; height: 100%; min-width: 200px; min-height: 200px; display: block; }
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: linear-gradient(135deg, #1d2140, #2a1d40);
+  color: var(--text);
+  text-align: center;
+  padding: 16px;
+}
+.overlay.hidden { display: none; }
+.overlay p { margin: 0; }
+
+.eq { display: flex; align-items: flex-end; gap: 6px; height: 48px; }
+.eq i { display: block; width: 8px; height: 8px; border-radius: 3px; background: var(--accent); }
+.eq.on i { animation: eq 0.9s ease-in-out infinite; }
+.eq.on i:nth-child(2) { animation-delay: -0.2s; background: var(--accent-2); }
+.eq.on i:nth-child(3) { animation-delay: -0.5s; }
+.eq.on i:nth-child(4) { animation-delay: -0.1s; background: var(--accent-2); }
+.eq.on i:nth-child(5) { animation-delay: -0.7s; }
+@keyframes eq { 0%, 100% { height: 8px; } 50% { height: 48px; } }
+@media (prefers-reduced-motion: reduce) { .eq.on i { animation-duration: 2.5s; } }
+
+.progress { height: 10px; margin-top: 12px; border-radius: 999px; background: var(--panel-2); overflow: hidden; }
+.progress-bar { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width 0.15s linear; }
+.progress-label { color: var(--muted); font-size: 0.85rem; margin: 4px 0 0; min-height: 1.3em; }
+
+.controls { display: flex; gap: 8px; margin: 12px 0; }
+.controls .btn { flex: 1; }
+.controls .btn[hidden] { display: none; }
+
+.attempts { margin: 6px 0; color: var(--muted); }
+.choices { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.choices .btn { min-height: 52px; justify-content: flex-start; text-align: left; padding: 8px 14px; }
+.choices .btn.wrong { text-decoration: line-through; color: var(--bad); }
+@media (min-width: 520px) { .choices { grid-template-columns: 1fr 1fr; } }
+
+.answer-form { display: flex; gap: 8px; }
+.answer-form input { flex: 1; }
+input, select, textarea {
+  min-height: var(--tap);
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid #3a3f52;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px; /* iOS 확대 방지 */
+}
+textarea { min-height: 100px; margin: 8px 0; }
+
+.feedback { min-height: 1.5em; margin: 8px 0; font-weight: 600; }
+.feedback.ok { color: var(--ok); }
+.feedback.bad { color: var(--bad); }
+
+.reveal { margin-top: 12px; padding: 16px; border-radius: var(--radius); background: var(--panel); }
+.reveal h2 { margin: 4px 0; }
+.reveal p { margin: 4px 0; }
+.reveal-result { font-weight: 700; }
+.reveal-result.ok { color: var(--ok); }
+.reveal-result.bad { color: var(--bad); }
+
+/* 결과 */
+.final-score { font-size: 3rem; font-weight: 800; margin: 0; }
+.result-list { padding-left: 1.4em; }
+.result-list li { margin: 6px 0; }
+.result-list .pts { float: right; font-weight: 700; }
+.result-list .ok { color: var(--ok); }
+.result-list .bad { color: var(--bad); }
+.new-record { color: var(--warn); font-weight: 700; }
+
+/* 곡 관리 */
+.manage-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.song-form { display: grid; gap: 10px; background: var(--panel); padding: 14px; border-radius: var(--radius); }
+.song-form label { display: grid; gap: 4px; font-size: 0.9rem; color: var(--muted); }
+.song-form .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.song-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.song-list li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--panel); border-radius: var(--radius); }
+.song-list li.off { opacity: 0.5; }
+.song-list .info { flex: 1; min-width: 0; }
+.song-list .info strong, .song-list .info span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.song-list .info span { color: var(--muted); font-size: 0.85rem; }
+.switch { display: flex; align-items: center; gap: 6px; min-height: var(--tap); font-size: 0.85rem; }
+.switch input { width: 22px; height: 22px; min-height: 0; }
+
+/* 토스트 */
+.toasts { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom)); transform: translateX(-50%); display: grid; gap: 8px; width: min(92vw, 520px); z-index: 100; pointer-events: none; }
+.toast { padding: 12px 16px; border-radius: var(--radius); background: #2b3047; box-shadow: 0 4px 16px #0008; animation: toast-in 0.2s ease-out; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }

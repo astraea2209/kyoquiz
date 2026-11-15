@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#11131a" />
+    <title>애니송 맞추기</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <div id="protocol-warning" class="banner warn" hidden>
+      파일을 직접(file://) 열면 YouTube 재생이 실패할 수 있습니다. README의 안내대로 로컬 서버(http://)로 열어 주세요.
+    </div>
+
+    <!-- 시작 화면 -->
+    <section id="screen-start" class="screen" data-screen="start">
+      <header class="app-header">
+        <h1>애니송 맞추기</h1>
+        <p class="sub">짧은 구간을 듣고 곡 제목이나 작품명을 맞혀 보세요.</p>
+      </header>
+
+      <div id="empty-notice" class="banner info" hidden>
+        <p>등록된 곡이 없습니다. 곡 관리에서 YouTube 링크로 곡을 추가해 주세요.</p>
+        <button type="button" class="btn primary" data-action="open-manage">곡 관리로 이동</button>
+      </div>
+
+      <fieldset class="mode-cards">
+        <legend>모드</legend>
+        <label class="mode-card">
+          <input type="radio" name="mode" value="random" checked />
+          <span class="mode-title">랜덤듣기</span>
+          <span class="mode-desc">곡의 무작위 구간을 짧게 듣고 맞힙니다. 다시듣기 1회.</span>
+        </label>
+        <label class="mode-card">
+          <input type="radio" name="mode" value="full" />
+          <span class="mode-title">전체듣기</span>
+          <span class="mode-desc">처음부터 들으며 제한시간 30초 안에 맞힙니다. 빨리 맞힐수록 고득점.</span>
+        </label>
+      </fieldset>
+
+      <div class="settings">
+        <fieldset class="segmented" id="clip-setting">
+          <legend>구간 길이</legend>
+          <label><input type="radio" name="clipLength" value="3" /><span>3초</span></label>
+          <label><input type="radio" name="clipLength" value="5" checked /><span>5초</span></label>
+          <label><input type="radio" name="clipLength" value="10" /><span>10초</span></label>
+        </fieldset>
+        <fieldset class="segmented">
+          <legend>라운드</legend>
+          <label><input type="radio" name="rounds" value="5" /><span>5</span></label>
+          <label><input type="radio" name="rounds" value="10" checked /><span>10</span></label>
+          <label><input type="radio" name="rounds" value="20" /><span>20</span></label>
+        </fieldset>
+        <fieldset class="segmented">
+          <legend>난이도</legend>
+          <label><input type="radio" name="difficulty" value="easy" /><span>쉬움</span></label>
+          <label><input type="radio" name="difficulty" value="normal" checked /><span>보통</span></label>
+          <label><input type="radio" name="difficulty" value="hard" /><span>어려움</span></label>
+        </fieldset>
+        <p class="hint" id="difficulty-hint"></p>
+      </div>
+
+      <p class="status" id="song-count"></p>
+      <p class="status" id="player-status">플레이어 준비 중…</p>
+      <div class="actions">
+        <button type="button" class="btn primary big" id="start-btn" disabled>게임 시작</button>
+        <button type="button" class="btn" data-action="open-manage">곡 관리</button>
+      </div>
+    </section>
+
+    <!-- 게임 화면: 플레이어 iframe을 유지하기 위해 display:none 대신 화면 밖으로 옮겨 숨긴다 -->
+    <section id="screen-game" class="screen keep-alive" data-screen="game">
+      <div class="game-header">
+        <span id="round-label" class="pill">1 / 10</span>
+        <span id="mode-label" class="pill muted"></span>
+        <span id="score-label" class="score">0점</span>
+        <button type="button" class="btn small ghost" id="quit-btn">그만하기</button>
+      </div>
+
+      <div class="stage" id="stage">
+        <div class="player-slot" id="player-slot-0"><div id="player-0"></div></div>
+        <div class="player-slot" id="player-slot-1"><div id="player-1"></div></div>
+        <div class="overlay" id="overlay">
+          <div class="eq" id="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+          <p id="overlay-text">재생 버튼을 눌러 주세요</p>
+        </div>
+      </div>
+
+      <div class="progress" aria-label="재생 진행">
+        <div class="progress-bar" id="progress-bar"></div>
+      </div>
+      <p class="progress-label" id="progress-label"></p>
+
+      <div class="controls">
+        <button type="button" class="btn primary" id="play-btn">재생</button>
+        <button type="button" class="btn" id="replay-btn">다시듣기 (-20점)</button>
+        <button type="button" class="btn ghost" id="pass-btn">패스</button>
+      </div>
+
+      <div id="answer-area">
+        <p class="attempts" id="attempts"></p>
+        <div class="choices" id="choices"></div>
+        <form id="answer-form" class="answer-form" autocomplete="off">
+          <input
+            id="answer-input"
+            type="text"
+            enterkeyhint="done"
+            placeholder="곡 제목 또는 작품명"
+            aria-label="정답 입력"
+          />
+          <button type="submit" class="btn primary">제출</button>
+        </form>
+        <p class="feedback" id="feedback" role="status"></p>
+      </div>
+
+      <div id="reveal" class="reveal" hidden>
+        <p class="reveal-result" id="reveal-result"></p>
+        <h2 id="reveal-title"></h2>
+        <p id="reveal-anime"></p>
+        <button type="button" class="btn primary big" id="next-btn">다음 곡</button>
+      </div>
+    </section>
+
+    <!-- 결과 화면 -->
+    <section id="screen-result" class="screen" data-screen="result" hidden>
+      <h1>결과</h1>
+      <p class="final-score"><span id="final-score">0</span>점</p>
+      <p id="high-score" class="status"></p>
+      <p id="result-note" class="status"></p>
+      <ol id="result-list" class="result-list"></ol>
+      <div class="actions">
+        <button type="button" class="btn primary big" id="again-btn">같은 설정으로 다시</button>
+        <button type="button" class="btn" id="home-btn">시작 화면</button>
+      </div>
+    </section>
+
+    <!-- 곡 관리 화면 -->
+    <section id="screen-manage" class="screen" data-screen="manage" hidden>
+      <div class="manage-header">
+        <h1>곡 관리</h1>
+        <button type="button" class="btn small" data-action="go-home">← 시작 화면</button>
+      </div>
+
+      <form id="song-form" class="song-form" autocomplete="off">
+        <label>YouTube 링크 또는 영상 ID
+          <input name="link" id="link-input" required placeholder="https://youtu.be/..." />
+        </label>
+        <p class="hint" id="link-result"></p>
+        <label>곡 제목 <input name="title" required /></label>
+        <label>제목 별칭 (쉼표로 구분) <input name="titleAliases" /></label>
+        <label>작품명 <input name="animeName" required /></label>
+        <label>작품 별칭 (쉼표로 구분) <input name="animeAliases" /></label>
+        <div class="row">
+          <label>종류
+            <select name="type">
+              <option value="OP">OP</option>
+              <option value="ED">ED</option>
+              <option value="삽입곡">삽입곡</option>
+            </select>
+          </label>
+          <label>hookStart (초, 선택) <input name="hookStart" type="number" min="0" step="1" inputmode="numeric" /></label>
+        </div>
+        <button type="submit" class="btn primary">곡 추가</button>
+      </form>
+
+      <h2>등록된 곡 <span id="manage-count"></span></h2>
+      <ul id="song-list" class="song-list"></ul>
+
+      <h2>내보내기 · 가져오기</h2>
+      <div class="actions">
+        <button type="button" class="btn" id="export-btn">JSON 내보내기</button>
+        <label class="btn file-btn">JSON 파일 가져오기<input type="file" id="import-file" accept="application/json,.json" hidden /></label>
+      </div>
+      <textarea id="import-text" rows="5" placeholder="JSON을 붙여넣고 아래 버튼을 누르세요"></textarea>
+      <button type="button" class="btn" id="import-text-btn">붙여넣은 JSON 가져오기</button>
+    </section>
+
+    <div id="toasts" class="toasts" aria-live="polite"></div>
+
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>
