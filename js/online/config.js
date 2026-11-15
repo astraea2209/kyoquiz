@@ -1,8 +1,7 @@
 // 온라인 대결 서버 주소 결정과 URL 만들기(순수 함수).
 
-// 배포 뒤 여기에 Worker 주소를 넣으면 모든 사용자의 기본값이 된다.
-// 예: 'https://anime-song-quiz-rooms.<계정>.workers.dev'
-export const DEFAULT_SERVER_URL = '';
+// 배포한 Worker 주소(npm run server:deploy). 모든 사용자의 기본값이 된다.
+export const DEFAULT_SERVER_URL = 'https://anime-song-quiz-rooms.anime-song-quiz.workers.dev';
 export const LOCAL_SERVER_PORT = 8787; // npm run server:dev
 
 const SERVER_STORAGE_KEY = 'asq.server';

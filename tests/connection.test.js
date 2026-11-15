@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { ClockSync } from '../js/online/net.js';
 import { RoomConnection } from '../js/online/connection.js';
 import {
+  DEFAULT_SERVER_URL,
   buildInviteLink,
   resolveServerUrl,
   roomCodeFromSearch,
@@ -243,7 +244,7 @@ test('설정: 서버 주소 우선순위', () => {
   assert.equal(resolveServerUrl({ search: '', hostname: 'localhost', storage }), 'https://saved.example');
   assert.equal(resolveServerUrl({ search: '', hostname: 'localhost' }), 'http://localhost:8787');
   assert.equal(resolveServerUrl({ search: '', hostname: '127.0.0.1' }), 'http://127.0.0.1:8787');
-  assert.equal(resolveServerUrl({ search: '', hostname: 'quiz.example.com' }), '');
+  assert.equal(resolveServerUrl({ search: '', hostname: 'quiz.example.com' }), DEFAULT_SERVER_URL);
 });
 
 test('설정: URL 만들기', () => {
