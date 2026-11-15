@@ -86,8 +86,9 @@
 - 완료(가짜 시계·소켓·플레이어 테스트까지): 방 상태 머신, 점수(SCORING.multi), 시계 오프셋, 재생 제어, 소켓 호스트 계층, Workers/Durable Object 어댑터
 - 완료(실제 확인): `wrangler dev`(로컬 workerd)에서 Node WebSocket 클라이언트 2개로 방 생성, 입장, ping/pong, 설정, 시작, ready, go(3초 뒤), 오답·정답, reveal, 끊김 후 토큰 재접속, 전원 퇴장 후 방 닫힘까지 한 라운드를 확인(2026-11-15). 스모크 스크립트는 저장소에 없다
 - 완료(실제 브라우저 확인, 2026-11-15): `npm run server:dev` + `python -m http.server`로 열고 브라우저 탭 2개에서 방 만들기, 초대 링크로 입장, 방장 설정이 상대에게 보임, 전체듣기 5라운드 진행(실제 YouTube 재생, 두 탭 재생 위치 일치, 공개 전 영상 가림), 오답·정답·점수·공개, 탭 새로고침 뒤 토큰으로 자동 복귀(점수 유지, 다음 라운드부터 합류), 최종 순위·한 판 더·나가기, 375px 폭 레이아웃
-- 배포함(2026-11-15): `https://anime-song-quiz-rooms.anime-song-quiz.workers.dev`(`/api/health`, 방 생성, WebSocket 입장 확인). `js/online/config.js`의 `DEFAULT_SERVER_URL`에 넣어 둠. `ALLOWED_ORIGINS`는 아직 `*`(페이지 주소가 정해지면 좁힐 것)
-- 미구현·미확인: 정적 페이지 공개(GitHub Pages 등), 랜덤듣기·쉬움(객관식) 화면의 실제 브라우저 확인, 모바일 실기기·카카오톡 인앱 브라우저, 시작 신호 소리 시각 오차 측정, 백그라운드 탭 동작, 재접속 배너(`연결이 끊겼어요`) 실제 확인
+- 배포함(2026-11-15): `https://anime-song-quiz-rooms.anime-song-quiz.workers.dev`(`/api/health`, 방 생성, WebSocket 입장 확인). `js/online/config.js`의 `DEFAULT_SERVER_URL`에 넣어 둠. `ALLOWED_ORIGINS`는 `https://astraea2209.github.io`와 로컬(8000)만 허용
+- 공개 페이지: https://astraea2209.github.io/kyoquiz/ (저장소 astraea2209/kyoquiz, main 브랜치 root, GitHub Pages)
+- 미구현·미확인: 랜덤듣기·쉬움(객관식) 화면의 실제 브라우저 확인, 모바일 실기기·카카오톡 인앱 브라우저, 시작 신호 소리 시각 오차 측정, 백그라운드 탭 동작, 재접속 배너(`연결이 끊겼어요`) 실제 확인
 - 실제 브라우저·기기로 확인하지 못함: 시작 신호 소리 시각 오차(브라우저 2개 이상에서 infoDelivery로 측정 필요), 모바일 자동 진행
 - 서버 규칙 중 코드에서 정한 것(문서에 없던 세부): 오류 과반(절반 초과) 판정은 준비 단계에서만 곡 교체, 시작 신호 뒤 오류는 그 사람만 제외. ready 시간 초과로 아무도 준비하지 못해도 곡 교체. 대기실에서도 끊기면 60초 유예 뒤 퇴장(새로고침 대비). 결과 화면에서 새 입장 허용. 랜덤듣기는 `duration`이 없는 곡을 제외(songs.json 12곡은 `duration`이 채워져 있음). 시작 신호는 `go` 전송 3초 뒤. 전원 이탈 시 방은 유예(60초)가 끝나면 닫힘(`onClose`)
 - 프로토콜: 클라이언트 `join/settings/start/ready/answer/pass/playerError/ping/leave`, 서버 `joined/state/prepare/go/locked/answerResult/rateLimited/reveal/gameOver/notice/error/pong/kicked`. 주의: 문서의 메시지 표에 없던 `joined`(토큰 전달), `answerResult`(본인에게만 오답 결과), `rateLimited`, `notice`, `pong`, `kicked`, `leave`를 추가했다. `reveal`에 `nextVideoId`가 있어 다음 곡을 cue한다
@@ -98,7 +99,7 @@
 2. 난이도, 구간 길이, 별칭 매칭 다듬기
 3. 곡 등록 도구 보강: 점검 스크립트와 가수 필드 완료. 남은 것: 점검 결과로 삭제·차단된 영상 정리(자동 비활성화 등), 정기 점검 방식
 4. 확장 모드(작품명 맞추기, 서바이벌, 타임어택)
-5. 친구와 대결 이어서(위 멀티 구현 현황 참고): 랜덤듣기·쉬움 확인 → 실기기 동기화 측정 → 정적 페이지 공개 후 `wrangler.toml`의 `ALLOWED_ORIGINS`를 그 주소로 좁혀 재배포
+5. 친구와 대결 이어서(위 멀티 구현 현황 참고): 랜덤듣기·쉬움 확인 → 실기기 동기화 측정 → 배포는 main을 push하면 Pages가 자동 갱신, 서버는 `npm run server:deploy`
 
 ## 미결정 사항
 
