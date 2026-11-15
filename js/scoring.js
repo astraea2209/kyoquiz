@@ -12,7 +12,7 @@ export const SCORING = Object.freeze({
     decay: 80, // max - decay = 최저 점수(20)
     timeLimit: 30, // 초
   },
-  // 멀티플레이(친구와 대결, 선착순). 숫자는 초안이므로 플레이 테스트 뒤 여기만 고친다.
+  // 멀티플레이(친구와 대결, 맞힌 사람 모두 속도 점수). 숫자는 초안이므로 플레이 테스트 뒤 여기만 고친다.
   multi: Object.freeze({
     speedBonusMax: 0.5, // 랜덤듣기: 기본 점수의 최대 +50%
     answerTimes: Object.freeze([10, 15, 20]), // 구간이 끝난 뒤 답변 시간(초)

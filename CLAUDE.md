@@ -34,12 +34,13 @@
 - `js/scoring.js`: 점수 상수와 계산. 밸런스 조정은 이 파일의 `SCORING`만 바꾼다. 멀티용은 `SCORING.multi`(속도 보너스 +50%, 답변 시간 10/15/20초, 인원 2~8)와 `scoreMulti`, `answerWindow`
 - `js/segment.js`: 랜덤듣기 구간 선택(앞뒤 10% 제외, hookStart ±5초 우선)
 - `js/linkParser.js`: YouTube 링크에서 videoId와 `t=` 시작 시간 추출
+- `js/volume.js`: 노래 볼륨(0~100, 기본 80, localStorage `asq.volume`). `VolumeControl`이 개인전·친구와 대결 플레이어 모두에 `setVolume`을 적용하고, 슬라이더(시작 화면, 개인전 게임, 대기실, 대결 게임)는 `bindVolumeInput`으로 같은 값을 공유한다. `js/player.js`는 `unMute` 때 볼륨을 다시 적용한다
 - `js/songs.js`: 곡 스키마, songs.json과 localStorage 병합, 영상 길이 캐시, 최고 점수, 설정 저장. 곡 필드: id, videoId, title, titleAliases, anime{name, aliases}, artist(선택, 표시만 하고 정답 인정 안 함), type, hookStart·skipStart·skipEnd·duration(선택, 초), enabled
 - `songs.json`: 기본 곡 목록(유명 애니 OP 12곡 + 블리치 OP·ED 15곡, 공식 채널 영상 위주. 블리치 ほうき星 영상은 14분짜리라 `enabled:false`). 제목은 한국어 표기, 원제·로마자·영어는 별칭. 가수는 한국어 표기가 있으면 한국어(예: 요네즈 켄시), 영문·원어 활동명은 그대로(예: YOASOBI, TK from 凛として時雨). `duration`은 점검 스크립트 `--write`로 채움(있으면 게임이 길이 측정용 음소거 로드를 건너뜀). `hookStart`는 아직 없음. `songs.sample.json`: 형식 예시(자리표시자 값)
 - `tools/check-songs.mjs`: songs.json 점검(oEmbed로 존재·임베드 가능 여부와 채널명, watch 페이지 `lengthSeconds`로 길이, duration 차이, id·videoId 중복). 순수 함수는 export해 `tests/checkSongs.test.js`에서 네트워크 없이 테스트
-- `tests/`: 단위 테스트 파일 15개(가짜 플레이어·시계·타이머·소켓 포함)
-- 멀티플레이(친구와 대결, 선착순) 핵심부. 설계는 Claude Docs 문서 "애니송 맞추기 멀티플레이 기획서"(https://claude.ai/artifact/3BLyVFbGYGhL7hk2pjG7SM). 서버 런타임과 멀티 화면에 의존하지 않는 부분만 구현됨:
-  - `server/room.js`: `Room` 방 상태 머신(대기실→준비→시작 대기→답변→공개→결과). 시계(`now`), 난수(`rng`), 타이머(`timers`), 전송(`send(connId, msg)`), 토큰 생성(`genToken`)을 주입받는다. 어댑터는 `handleMessage(connId, msg)`와 `handleDisconnect(connId)`만 부르면 된다. 판정·구간 선택·점수는 `js/judge.js`, `js/segment.js`, `js/scoring.js`를 그대로 import. 시간·한도 상수는 `ROOM_CONFIG`(생성 때 `config`로 덮어쓰기)
+- `tests/`: 단위 테스트 파일 16개(가짜 플레이어·시계·타이머·소켓 포함)
+- 멀티플레이(친구와 대결, 속도 점수) 핵심부. 설계는 Claude Docs 문서 "애니송 맞추기 멀티플레이 기획서"(https://claude.ai/artifact/3BLyVFbGYGhL7hk2pjG7SM). 서버 런타임과 멀티 화면에 의존하지 않는 부분만 구현됨:
+  - `server/room.js`: `Room` 방 상태 머신(대기실→준비→시작 대기→답변→공개→결과). 라운드는 첫 정답에 끝나지 않고, 전원이 정답·포기·오답 소진(또는 제외)되거나 답변 시간이 끝날 때 중 먼저 오는 쪽에서 공개한다. 정답자는 모두 각자 도착 시간에 따른 점수(`scoreMulti`)를 받고, 점수는 공개 때 반영한다. 시계(`now`), 난수(`rng`), 타이머(`timers`), 전송(`send(connId, msg)`), 토큰 생성(`genToken`)을 주입받는다. 어댑터는 `handleMessage(connId, msg)`와 `handleDisconnect(connId)`만 부르면 된다. 판정·구간 선택·점수는 `js/judge.js`, `js/segment.js`, `js/scoring.js`를 그대로 import. 시간·한도 상수는 `ROOM_CONFIG`(생성 때 `config`로 덮어쓰기)
   - `server/roomHost.js`: `RoomHost`. Room을 소켓({send, close})에 연결하는 런타임 무관 계층(JSON 파싱, 메시지 크기 2KB·빈도 40개/5초 제한, join 10초 제한, 빈 방 60초 뒤 닫기, 방이 닫히면 소켓 정리)
   - `server/index.js`: Cloudflare Workers + Durable Objects 진입점. `POST /api/rooms`(방 생성), `GET /ws?code=`(WebSocket), `GET /api/health`. 방 하나 = `RoomDO` 하나, 상태는 메모리에만 있다(재배포·재시작하면 진행 중인 방이 사라짐). `songs.json`을 번들로 가져다 쓴다. `wrangler.toml`: Durable Object 바인딩(`ROOMS`)과 `ALLOWED_ORIGINS`(허용 사이트)
   - `js/online/net.js`: 시계 차이 계산(순수 함수와 `ClockSync`)
@@ -73,11 +74,12 @@
 
 ## 검증 현황
 
-- 확인함: 단위 테스트 187개 통과(개인전·곡 점검 67개 + 멀티 120개), 모든 JS 파일 `node --check` 통과, 가짜 YT 객체를 넣은 헤드리스 Chrome에서 곡 추가부터 결과 화면까지의 흐름, 실제 브라우저에서 YouTube 재생과 소리·영상(사용자 확인), songs.json 12곡 모두 localhost에서 임베드 재생 오류 없음(2026-11-15), `tools/check-songs.mjs`로 12곡 모두 정상(oEmbed 200, duration 채움, 2026-11-15)
+- 확인함: 단위 테스트 197개 통과(개인전·곡 점검·볼륨 72개 + 멀티 125개), 모든 JS 파일 `node --check` 통과, 가짜 YT 객체를 넣은 헤드리스 Chrome에서 곡 추가부터 결과 화면까지의 흐름, 실제 브라우저에서 YouTube 재생과 소리·영상(사용자 확인), songs.json 12곡 모두 localhost에서 임베드 재생 오류 없음(2026-11-15), `tools/check-songs.mjs`로 12곡 모두 정상(oEmbed 200, duration 채움, 2026-11-15)
 - 실제 YouTube로 확인함(데스크톱 Chromium, 2026-11-15):
   - 0초 소리 누출 없음. iframe의 infoDelivery 메시지로 기록해 보니, 길이를 모르는 5곡 모두 0초 부근에서는 음소거였고 unMute는 구간 시작 위치에서만 일어났다. 3초 구간은 약 3.1초 재생
   - 오버레이는 공개 전까지 무대 전체를 가리고, 공개 때만 현재 플레이어가 보인다. controls=0이라 공개 중에도 제목 표시줄은 안 보임
   - 재생 오류: 존재하지 않는 videoId는 실제로 오류 150을 낸다. 첫 곡일 때는 곡 교체 후 재생 버튼 대기와 라운드 축소, 다음 곡으로 cue해 둔 곡일 때는 cue 오류를 무시하고 차례가 오면 종료 처리. 둘 다 정상
+- 볼륨(2026-11-15, 로컬 Chromium): 슬라이더 4개가 같은 값으로 움직이고 저장되며, 실제 YouTube 플레이어 2개의 `getVolume()`이 슬라이더 값과 일치. 375px 폭 시작·게임 화면 배치 확인. 귀로 듣는 확인과 iOS(iOS Safari는 JS 볼륨 조절을 무시함)는 못 함
 - 확인하지 못함: 가수 표시(정답 공개 화면, 곡 관리 목록·폼)를 실제 브라우저에서 눈으로 보지 않음(문법 검사와 저장·내보내기 테스트만), oEmbed 200이어도 실제 임베드 재생이 막힌 경우는 스크립트로 못 잡음, iOS 등 모바일에서 unMute 후 소리, 영상이 끝까지 재생된 뒤 추천 영상 화면(정답 공개 중에만 보일 수 있음), 오류 101·150 중 "임베드 금지" 영상의 실제 동작
 
 ## 멀티플레이 구현 현황 (feature 브랜치 claude/multiplayer-core-1e3c9b)
@@ -88,10 +90,11 @@
 - 완료(실제 브라우저 확인, 2026-11-15): `npm run server:dev` + `python -m http.server`로 열고 브라우저 탭 2개에서 방 만들기, 초대 링크로 입장, 방장 설정이 상대에게 보임, 전체듣기 5라운드 진행(실제 YouTube 재생, 두 탭 재생 위치 일치, 공개 전 영상 가림), 오답·정답·점수·공개, 탭 새로고침 뒤 토큰으로 자동 복귀(점수 유지, 다음 라운드부터 합류), 최종 순위·한 판 더·나가기, 375px 폭 레이아웃
 - 배포함(2026-11-15): `https://anime-song-quiz-rooms.anime-song-quiz.workers.dev`(`/api/health`, 방 생성, WebSocket 입장 확인). `js/online/config.js`의 `DEFAULT_SERVER_URL`에 넣어 둠. `ALLOWED_ORIGINS`는 `https://astraea2209.github.io`와 로컬(8000)만 허용
 - 공개 페이지: https://astraea2209.github.io/kyoquiz/ (저장소 astraea2209/kyoquiz, main 브랜치 root, GitHub Pages)
+- 라운드 종료 규칙 변경(2026-11-15, 브랜치 claude/multiplayer-answer-volume-settings-85973d): 전원 정답·포기·소진 또는 시간 만료. 단위 테스트만 통과, 실제 브라우저 2탭 확인은 아직. 프로토콜이 바뀌어(아래) 서버(`npm run server:deploy`)와 Pages를 같이 배포해야 한다
 - 미구현·미확인: 랜덤듣기·쉬움(객관식) 화면의 실제 브라우저 확인, 모바일 실기기·카카오톡 인앱 브라우저, 시작 신호 소리 시각 오차 측정, 백그라운드 탭 동작, 재접속 배너(`연결이 끊겼어요`) 실제 확인
 - 실제 브라우저·기기로 확인하지 못함: 시작 신호 소리 시각 오차(브라우저 2개 이상에서 infoDelivery로 측정 필요), 모바일 자동 진행
 - 서버 규칙 중 코드에서 정한 것(문서에 없던 세부): 오류 과반(절반 초과) 판정은 준비 단계에서만 곡 교체, 시작 신호 뒤 오류는 그 사람만 제외. ready 시간 초과로 아무도 준비하지 못해도 곡 교체. 대기실에서도 끊기면 60초 유예 뒤 퇴장(새로고침 대비). 결과 화면에서 새 입장 허용. 랜덤듣기는 `duration`이 없는 곡을 제외(songs.json 12곡은 `duration`이 채워져 있음). 시작 신호는 `go` 전송 3초 뒤. 전원 이탈 시 방은 유예(60초)가 끝나면 닫힘(`onClose`)
-- 프로토콜: 클라이언트 `join/settings/start/ready/answer/pass/playerError/ping/leave`, 서버 `joined/state/prepare/go/locked/answerResult/rateLimited/reveal/gameOver/notice/error/pong/kicked`. 주의: 문서의 메시지 표에 없던 `joined`(토큰 전달), `answerResult`(본인에게만 오답 결과), `rateLimited`, `notice`, `pong`, `kicked`, `leave`를 추가했다. `reveal`에 `nextVideoId`가 있어 다음 곡을 cue한다
+- 프로토콜: 클라이언트 `join/settings/start/ready/answer/pass/playerError/ping/leave`, 서버 `joined/state/prepare/go/locked/answerResult/rateLimited/reveal/gameOver/notice/error/pong/kicked`. 주의: 문서의 메시지 표에 없던 `joined`(토큰 전달), `answerResult`(본인에게만 오답 결과), `rateLimited`, `notice`, `pong`, `kicked`, `leave`를 추가했다. `reveal`에 `nextVideoId`가 있어 다음 곡을 cue한다. 정답 처리: 맞힌 사람에게만 `answerResult {correct: true, points, elapsed, order}`, 모두에게 `locked {reason: 'correct'}`, 상태 `correct`. `reveal`·`gameOver.history`는 `correctPlayers [{playerId, nickname, elapsed, points}]`(처리 순서)와 `reason: 'done'|'timeout'`을 싣는다(예전 `winnerId`·`winnerNickname`·`points`·`elapsed`와 `reason: 'correct'|'exhausted'`는 없어짐)
 
 ## 다음 작업 후보 (기획서 개발 단계)
 

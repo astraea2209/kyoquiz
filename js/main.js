@@ -11,6 +11,7 @@ import {
 import { roomCodeFromSearch } from './online/config.js';
 import { OnlineApp } from './online/ui.js';
 import { App } from './ui.js';
+import { VolumeControl, bindVolumeInput } from './volume.js';
 
 function getStorage() {
   try {
@@ -24,6 +25,11 @@ function getStorage() {
 }
 
 const storage = getStorage();
+// 노래 볼륨: 개인전·친구와 대결의 모든 플레이어에 같은 값을 쓴다(친구와 대결 슬라이더는 OnlineApp이 묶는다)
+const volume = new VolumeControl(storage);
+for (const input of document.querySelectorAll('input[data-volume]')) {
+  bindVolumeInput(volume, input, input.parentElement.querySelector('.volume-value'));
+}
 const store = new SongStore(storage);
 const app = new App({
   store,
@@ -34,7 +40,7 @@ const app = new App({
 app.init();
 
 // 친구와 대결(멀티플레이). 플레이어는 처음 입장할 때 따로 만든다.
-const online = new OnlineApp({ app, createPlayer: createYouTubePlayer, storage, location: window.location });
+const online = new OnlineApp({ app, createPlayer: createYouTubePlayer, storage, location: window.location, volume });
 online.init();
 document.querySelector('[data-action="open-online"]').addEventListener('click', () => online.open());
 const invitedRoom = roomCodeFromSearch(window.location.search);
@@ -60,7 +66,10 @@ fetch('songs.json', { cache: 'no-cache' })
 Promise.allSettled([createYouTubePlayer('player-0'), createYouTubePlayer('player-1')]).then(
   (results) => {
     const players = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
-    if (players.length) app.setPlayers(players);
+    if (players.length) {
+      volume.attach(players);
+      app.setPlayers(players);
+    }
     else app.setPlayerError(results[0].reason ?? new Error('알 수 없는 오류'));
   },
 );

@@ -9,6 +9,7 @@ import { buildInviteLink, resolveServerUrl, roomsUrl, webSocketUrl } from './con
 import { ClockSync } from './net.js';
 import { OnlinePlayback, PLAYBACK_STAGE } from './playback.js';
 import { OnlineSession } from './session.js';
+import { bindVolumeInput } from '../volume.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -16,6 +17,7 @@ const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const MODE_LABEL = { [MODE.RANDOM]: '랜덤듣기', [MODE.FULL]: '전체듣기' };
 const DIFFICULTY_LABEL = { [DIFFICULTY.EASY]: '쉬움', [DIFFICULTY.NORMAL]: '보통', [DIFFICULTY.HARD]: '어려움' };
 const STATUS_CHIP = {
+  correct: '정답',
   passed: '포기',
   exhausted: '기회 소진',
   error: '재생 오류',
@@ -24,7 +26,7 @@ const STATUS_CHIP = {
 };
 const REASON_TEXT = {
   timeout: '시간 초과 — 아무도 맞히지 못했어요',
-  exhausted: '모두 포기하거나 기회를 다 썼어요',
+  done: '모두 포기하거나 기회를 다 썼어요',
 };
 const GAME_OVER_NOTE = {
   'not-enough-players': '남은 인원이 부족해 게임을 마쳤습니다.',
@@ -79,8 +81,10 @@ export class OnlineApp {
    * @param {(element: string) => Promise<object>} opts.createPlayer  YouTube 플레이어 생성(js/player.js)
    * @param {Storage} opts.storage  localStorage(닉네임·서버 주소)
    * @param {Location} opts.location
+   * @param {import('../volume.js').VolumeControl} [opts.volume]  노래 볼륨(개인전과 공유)
    */
-  constructor({ app, createPlayer, storage, location }) {
+  constructor({ app, createPlayer, storage, location, volume = null }) {
+    this.volume = volume;
     this.app = app;
     this.createPlayer = createPlayer;
     this.storage = storage;
@@ -108,6 +112,18 @@ export class OnlineApp {
       $('#screen-start'),
     );
     this.bindEntry();
+  }
+
+  /** 볼륨 슬라이더. 개인전 화면과 같은 VolumeControl을 공유한다 */
+  volumeRow() {
+    const input = el('input', { type: 'range', min: '0', max: '100', step: '1', 'aria-label': '노래 볼륨' });
+    const value = el('span', { class: 'volume-value', 'aria-hidden': 'true' });
+    if (this.volume) bindVolumeInput(this.volume, input, value);
+    return el(
+      'div',
+      { class: 'volume-row' },
+      el('label', { class: 'volume-control' }, el('span', { class: 'volume-label', text: '볼륨' }), input, value),
+    );
   }
 
   // ---------- 진입 ----------
@@ -140,7 +156,7 @@ export class OnlineApp {
       'section',
       { id: 'screen-online-entry', class: 'screen', 'data-screen': 'online-entry', hidden: true },
       el('div', { class: 'manage-header' }, el('h1', { text: '친구와 대결' }), el('button', { type: 'button', class: 'btn small', id: 'on-entry-back', text: '← 시작 화면' })),
-      el('p', { class: 'sub', text: '방을 만들고 코드나 링크를 공유하면 친구들이 들어옵니다. 같은 곡을 동시에 듣고 먼저 맞히는 사람이 점수를 가져가요.' }),
+      el('p', { class: 'sub', text: '방을 만들고 코드나 링크를 공유하면 친구들이 들어옵니다. 같은 곡을 동시에 듣고 맞힌 사람은 모두 점수를 받아요. 빨리 맞힐수록 점수가 높아요.' }),
       el('label', { class: 'field' }, '닉네임', el('input', { id: 'on-nickname', maxlength: '12', autocomplete: 'off', placeholder: '최대 12글자' })),
       el('div', { class: 'actions' }, el('button', { type: 'button', class: 'btn primary big', id: 'on-create', text: '방 만들기' })),
       el('h2', { text: '코드로 입장' }),
@@ -186,6 +202,7 @@ export class OnlineApp {
     const players = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
     if (!players.length) throw new Error('YouTube 플레이어를 준비하지 못했습니다. 인터넷 연결을 확인해 주세요.');
     this.players = players;
+    this.volume?.attach(players);
     this.playback = new OnlinePlayback({
       players,
       clock: this.clock,
@@ -349,6 +366,7 @@ export class OnlineApp {
       el('ul', { id: 'on-members', class: 'member-list' }),
       el('h2', {}, '설정 ', el('span', { id: 'on-settings-note', class: 'sub' })),
       el('div', { class: 'settings', id: 'on-settings' }, ...groups),
+      this.volumeRow(),
       el('div', { class: 'actions' }, el('button', { type: 'button', class: 'btn primary big', id: 'on-start', text: '게임 시작', onclick: () => this.session?.start() })),
       el('p', { class: 'status', id: 'on-lobby-hint' }),
       el('div', { class: 'actions' }, el('button', { type: 'button', class: 'btn ghost', id: 'on-leave-lobby', text: '방 나가기', onclick: () => this.leave() })),
@@ -413,6 +431,7 @@ export class OnlineApp {
         el('span', { id: 'on-score-label', class: 'score' }),
         el('button', { type: 'button', class: 'btn small ghost', id: 'on-quit', text: '나가기', onclick: () => this.leave({ ask: true }) }),
       ),
+      this.volumeRow(),
       el(
         'div',
         { class: 'stage' },
@@ -482,7 +501,7 @@ export class OnlineApp {
     if (status === 'timeout') return '준비가 늦어 이번 라운드는 구경만 해요';
     if (status === 'absent') return '다음 라운드부터 함께해요';
     if (stage === PLAYBACK_STAGE.ERROR || status === 'error') return '재생 오류 — 이번 라운드는 제외돼요';
-    if (stage === PLAYBACK_STAGE.MISSED) return '시작을 놓쳤어요. 다른 사람의 정답을 기다려 주세요';
+    if (stage === PLAYBACK_STAGE.MISSED) return '시작을 놓쳤어요. 다른 사람들이 끝낼 때까지 기다려 주세요';
     if (s.phase === 'starting') {
       const left = s.countdownSeconds();
       return left ? `${left}` : '시작!';
@@ -494,6 +513,9 @@ export class OnlineApp {
   feedbackText() {
     const s = this.session;
     const status = s.me?.status;
+    if (s.myCorrect) {
+      return { text: `정답! +${s.myCorrect.points}점 · ${Number(s.myCorrect.elapsed).toFixed(1)}초 — 다른 사람을 기다리는 중…`, kind: 'ok' };
+    }
     if (status === 'exhausted') return { text: '기회를 모두 썼어요. 다른 사람을 기다리는 중…', kind: 'bad' };
     if (status === 'passed') return { text: '패스했어요. 다른 사람을 기다리는 중…', kind: '' };
     if (s.feedback === 'rate') return { text: '너무 빨라요. 1초 뒤에 다시 제출해 주세요.', kind: 'bad' };
@@ -570,9 +592,12 @@ export class OnlineApp {
     if (revealed) {
       const r = s.reveal;
       const result = $('#on-reveal-result');
-      if (r.winnerId) {
-        const mine = r.winnerId === s.you;
-        result.textContent = `${mine ? '내가 맞혔어요! ' : `${r.winnerNickname}님이 맞혔어요. `}+${r.points}점 · ${Number(r.elapsed).toFixed(1)}초`;
+      const corrects = r.correctPlayers ?? [];
+      if (corrects.length) {
+        const mine = corrects.some((c) => c.playerId === s.you);
+        result.textContent = `정답 ${corrects.length}명: ${corrects
+          .map((c) => `${c.playerId === s.you ? '나' : c.nickname} +${c.points}점(${Number(c.elapsed).toFixed(1)}초)`)
+          .join(', ')}`;
         result.className = `reveal-result ${mine ? 'ok' : ''}`;
       } else {
         result.textContent = REASON_TEXT[r.reason] ?? '아무도 맞히지 못했어요';
@@ -596,7 +621,7 @@ export class OnlineApp {
         .filter((p) => !p.left)
         .map((p) => {
           const chip = !p.connected ? '연결 끊김' : STATUS_CHIP[p.status] ?? '';
-          const winner = revealed && s.reveal.winnerId === p.id;
+          const winner = revealed && (s.reveal.correctPlayers ?? []).some((c) => c.playerId === p.id);
           return el(
             'li',
             { class: `${p.id === s.you ? 'me' : ''} ${winner ? 'winner' : ''}`.trim() },
@@ -645,15 +670,17 @@ export class OnlineApp {
       ),
     );
     $('#on-history').replaceChildren(
-      ...(over?.history ?? []).map((h) =>
-        el(
+      ...(over?.history ?? []).map((h) => {
+        const corrects = h.correctPlayers ?? [];
+        const mine = corrects.find((c) => c.playerId === s.you);
+        return el(
           'li',
           {},
-          el('span', { class: 'pts', text: h.winnerId ? `+${h.points}점` : '' }),
-          el('span', { class: h.winnerId ? 'ok' : 'bad', text: h.winnerId ? '○ ' : '× ' }),
-          `${h.title} — ${h.winnerNickname ? `${h.winnerNickname} (${Number(h.elapsed).toFixed(1)}초)` : '정답자 없음'}`,
-        ),
-      ),
+          el('span', { class: 'pts', text: mine ? `+${mine.points}점` : '' }),
+          el('span', { class: corrects.length ? 'ok' : 'bad', text: corrects.length ? '○ ' : '× ' }),
+          `${h.title} — ${corrects.length ? corrects.map((c) => `${c.nickname} (${Number(c.elapsed).toFixed(1)}초)`).join(', ') : '정답자 없음'}`,
+        );
+      }),
     );
     $('#on-again').hidden = !s.isHost;
     $('#on-result-hint').textContent = s.isHost ? '' : '방장이 다시 시작하길 기다리는 중…';

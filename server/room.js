@@ -1,9 +1,11 @@
-// 멀티플레이("친구와 대결", 선착순) 방 상태 머신.
+// 멀티플레이("친구와 대결") 방 상태 머신.
 // DOM·네트워크·실제 시계에 의존하지 않는다. 시계(now), 난수(rng), 타이머(timers), 메시지 전송(send)을 주입받는다.
 // 실행 환경(Cloudflare Durable Object, Node ws 등)에 맞춘 어댑터가 handleMessage/handleDisconnect를 부르고
 // send(connId, message)로 소켓에 쓰면 된다.
 //
 // 단계: 대기실(lobby) → 준비(preparing) → 시작 대기(starting) → 답변(answering) → 공개(revealed) → … → 결과(results)
+// 라운드 종료: 참가자 전원이 정답을 맞혔거나 포기·오답 소진·제외됐을 때, 또는 답변 시간이 끝났을 때 중 먼저 오는 것.
+// 정답자는 각자 도착 시간에 따른 점수를 받는다(첫 정답자가 나와도 라운드는 계속된다).
 //
 // 클라이언트 → 서버: join, settings, start, ready, answer, pass, playerError, ping, leave
 // 서버 → 클라이언트: joined, state, prepare, go, locked, answerResult, rateLimited, reveal, gameOver, notice, error, pong, kicked
@@ -33,6 +35,7 @@ export const PLAYER_STATUS = Object.freeze({
   ABSENT: 'absent', // 접속이 끊겼거나 이번 라운드 도중 합류해서 제외
   PASSED: 'passed', // 포기
   EXHAUSTED: 'exhausted', // 오답 기회 소진
+  CORRECT: 'correct', // 정답을 맞혀 다른 사람을 기다리는 중
 });
 
 // 시간·한도. 운영 값은 확정 전이므로 Room 생성 때 config로 덮어쓸 수 있다.
@@ -517,6 +520,9 @@ export class Room {
         usedChoices: new Set(),
         lastAnswerAt: null,
         errorCode: null,
+        correctOrder: null, // 정답 처리 순서(같은 ms 도착도 구분)
+        elapsed: null,
+        points: 0,
       });
     }
     this.round = {
@@ -528,6 +534,7 @@ export class Room {
       startAt: null,
       deadlineAt: null,
       players,
+      correctCount: 0,
     };
     this.phase = ROOM_PHASE.PREPARING;
 
@@ -675,7 +682,25 @@ export class Room {
 
     const correct = easy ? round.choices[key].correct : judgeAnswer(key, round.song, this.difficulty).correct;
     if (correct) {
-      this.finishRound('correct', player, (arrivedAt - round.startAt) / 1000);
+      // 점수는 공개 때 반영한다(공개 전에는 다른 사람에게 점수 변화가 보이지 않게)
+      entry.status = PLAYER_STATUS.CORRECT;
+      entry.correctOrder = ++round.correctCount;
+      entry.elapsed = (arrivedAt - round.startAt) / 1000;
+      entry.points = scoreMulti({
+        mode: this.settings.mode,
+        clipLength: this.settings.clipLength,
+        elapsed: entry.elapsed,
+        answerTime: this.settings.answerTime,
+      });
+      this.sendToPlayer(player, {
+        type: 'answerResult',
+        roundId: round.id,
+        correct: true,
+        points: entry.points,
+        elapsed: entry.elapsed,
+        order: entry.correctOrder,
+      });
+      this.afterLock(player, 'correct');
       return;
     }
     if (easy) entry.usedChoices.add(key);
@@ -701,30 +726,31 @@ export class Room {
     this.checkAllDone();
   }
 
-  /** 정답을 낼 수 있는 사람이 아무도 안 남았으면 라운드를 끝낸다 */
+  /** 정답을 낼 수 있는 사람이 아무도 안 남았으면(전원 정답·포기·소진·제외) 라운드를 끝낸다 */
   checkAllDone() {
     if (this.phase !== ROOM_PHASE.STARTING && this.phase !== ROOM_PHASE.ANSWERING) return;
-    if (this.entriesOf(PLAYER_STATUS.READY).length === 0) this.finishRound('exhausted');
+    if (this.entriesOf(PLAYER_STATUS.READY).length === 0) this.finishRound('done');
   }
 
   // ---------- 공개 ----------
-  /** @param {'correct'|'timeout'|'exhausted'} reason */
-  finishRound(reason, winner = null, elapsed = null) {
+  /** @param {'done'|'timeout'} reason  done: 남은 사람이 없음, timeout: 답변 시간 끝 */
+  finishRound(reason) {
     if (this.phase !== ROOM_PHASE.STARTING && this.phase !== ROOM_PHASE.ANSWERING) return;
     const round = this.round;
     this.clearRoundTimers();
 
-    let points = 0;
-    if (winner) {
-      points = scoreMulti({
-        mode: this.settings.mode,
-        clipLength: this.settings.clipLength,
-        elapsed,
-        answerTime: this.settings.answerTime,
+    // 정답자: 처리 순서대로. 나간 사람도 이미 맞힌 점수는 받는다
+    const correctPlayers = [...round.players]
+      .filter(([, e]) => e.status === PLAYER_STATUS.CORRECT)
+      .sort(([, a], [, b]) => a.correctOrder - b.correctOrder)
+      .map(([id, e]) => {
+        const player = this.players.get(id);
+        if (player) {
+          player.score += e.points;
+          player.correct++;
+        }
+        return { playerId: id, nickname: player?.nickname ?? null, elapsed: e.elapsed, points: e.points };
       });
-      winner.score += points;
-      winner.correct++;
-    }
     const excluded = [];
     for (const [id, e] of round.players) {
       if ([PLAYER_STATUS.ERROR, PLAYER_STATUS.TIMEOUT, PLAYER_STATUS.ABSENT].includes(e.status)) {
@@ -738,10 +764,7 @@ export class Room {
       title: song.title,
       animeName: song.anime?.name ?? null,
       reason,
-      winnerId: winner?.id ?? null,
-      winnerNickname: winner?.nickname ?? null,
-      elapsed,
-      points,
+      correctPlayers,
       excluded,
     };
     this.history.push(record);

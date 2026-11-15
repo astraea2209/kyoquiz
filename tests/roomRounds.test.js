@@ -58,22 +58,87 @@ test('시작 신호 전의 답은 무시된다', () => {
   assert.equal(env.msgs('a', 'reveal').length, 0);
 });
 
-test('정답: 첫 정답자만 득점(속도 보너스), reveal에 곡·승자·시간·점수', () => {
+test('정답: 맞힌 사람만 잠기고 라운드는 계속, 전원이 끝나면 공개(정답자마다 속도 점수)', () => {
+  const env = createEnv();
+  env.joinAll('a', 'b', 'c');
+  env.begin();
+  const title = env.round().song.title;
+  env.timers.advance(4000); // 시작 신호 뒤 4초
+  env.answer('b', env.correctText().toLowerCase());
+  // 100 × (1 + 0.5 × (1 − 4/20)) = 140, 본인에게만 결과
+  assert.deepEqual(env.last('b', 'answerResult'), { type: 'answerResult', roundId: 1, correct: true, points: 140, elapsed: 4, order: 1 });
+  assert.equal(env.msgs('a', 'answerResult').length, 0);
+  assert.deepEqual(env.last('a', 'locked'), { type: 'locked', roundId: 1, playerId: 'p2', reason: 'correct' });
+  assert.equal(env.state().phase, ROOM_PHASE.ANSWERING, '첫 정답자가 나와도 라운드는 계속');
+  assert.equal(env.state().players[1].status, PLAYER_STATUS.CORRECT);
+  assert.equal(env.state().players[1].score, 0, '점수는 공개 때 반영');
+  assert.ok(!JSON.stringify([env.msgs('a'), env.msgs('b'), env.msgs('c')]).includes(title), '공개 전에는 정답이 새지 않는다');
+
+  // 맞힌 사람의 추가 답·패스는 무시
+  env.timers.advance(1000);
+  env.answer('b', env.correctText());
+  env.send('b', { type: 'pass', roundId: 1 });
+  assert.equal(env.msgs('b', 'answerResult').length, 1);
+  assert.equal(env.msgs('a', 'locked').length, 1);
+
+  env.timers.advance(5000); // 시작 신호 뒤 10초
+  env.answer('a', env.correctText());
+  assert.equal(env.last('a', 'answerResult').order, 2);
+  assert.equal(env.state().phase, ROOM_PHASE.ANSWERING, 'c가 아직 남았다');
+  env.send('c', { type: 'pass', roundId: 1 });
+  assert.equal(env.state().phase, ROOM_PHASE.REVEALED);
+  const reveal = env.last('a', 'reveal');
+  assert.equal(reveal.reason, 'done');
+  assert.deepEqual(reveal.correctPlayers, [
+    { playerId: 'p2', nickname: 'b', elapsed: 4, points: 140 },
+    { playerId: 'p1', nickname: 'a', elapsed: 10, points: 125 }, // 100 × (1 + 0.5 × (1 − 10/20))
+  ]);
+  assert.equal(reveal.song.title, title);
+  assert.deepEqual(reveal.scores, [{ playerId: 'p1', score: 125 }, { playerId: 'p2', score: 140 }, { playerId: 'p3', score: 0 }]);
+  assert.deepEqual(env.state().players.map((p) => [p.score, p.correct]), [[125, 1], [140, 1], [0, 0]]);
+  assert.deepEqual(env.msgs('a', 'reveal'), env.msgs('c', 'reveal'));
+});
+
+test('전원 정답이면 마지막 정답 즉시 공개', () => {
   const env = createEnv();
   env.joinAll('a', 'b');
   env.begin();
-  env.timers.advance(4000); // 시작 신호 뒤 4초
-  env.answer('b', env.correctText().toLowerCase());
-  const reveal = env.last('a', 'reveal');
-  assert.equal(reveal.winnerNickname, 'b');
-  assert.equal(reveal.elapsed, 4);
-  assert.equal(reveal.points, 140); // 100 × (1 + 0.5 × (1 − 4/20))
-  assert.equal(reveal.reason, 'correct');
-  assert.equal(reveal.song.title, env.round().song.title);
-  assert.deepEqual(reveal.scores, [{ playerId: 'p1', score: 0 }, { playerId: 'p2', score: 140 }]);
+  env.answer('a', env.correctText());
+  assert.equal(env.state().phase, ROOM_PHASE.ANSWERING);
+  env.timers.advance(3000);
+  env.answer('b', env.correctText());
   assert.equal(env.state().phase, ROOM_PHASE.REVEALED);
-  assert.equal(env.state().players[1].score, 140);
-  assert.deepEqual(env.msgs('a', 'reveal'), env.msgs('b', 'reveal'));
+  assert.deepEqual(env.correctNames(env.last('a', 'reveal')), ['a', 'b']);
+  assert.equal(env.timers.pending(), 1, '공개 타이머만 남는다(답변 마감 타이머 해제)');
+});
+
+test('시간이 끝나면 남은 사람이 있어도 공개, 그때까지의 정답자는 득점', () => {
+  const env = createEnv();
+  env.joinAll('a', 'b');
+  env.begin(); // 창 20초
+  env.timers.advance(2000);
+  env.answer('a', env.correctText());
+  env.timers.advance(17_999);
+  assert.equal(env.state().phase, ROOM_PHASE.ANSWERING);
+  env.timers.advance(1);
+  const reveal = env.last('b', 'reveal');
+  assert.equal(reveal.reason, 'timeout');
+  assert.deepEqual(env.correctNames(reveal), ['a']);
+  assert.deepEqual(env.state().players.map((p) => p.score), [reveal.correctPlayers[0].points, 0]);
+});
+
+test('맞힌 뒤 연결이 끊겨도 점수는 받는다', () => {
+  const env = createEnv();
+  env.joinAll('a', 'b', 'c');
+  env.begin();
+  env.answer('c', env.correctText());
+  env.room.handleDisconnect('c');
+  assert.equal(env.state().players[2].status, PLAYER_STATUS.CORRECT);
+  env.passRest();
+  const reveal = env.last('a', 'reveal');
+  assert.deepEqual(env.correctNames(reveal), ['c']);
+  assert.ok(env.state().players[2].score > 0);
+  assert.deepEqual(reveal.excluded, []);
 });
 
 test('작품명·별칭·오타도 정답(보통 난이도)', () => {
@@ -81,7 +146,7 @@ test('작품명·별칭·오타도 정답(보통 난이도)', () => {
   env.joinAll('a', 'b');
   env.begin();
   env.answer('a', env.round().song.anime.name);
-  assert.equal(env.last('a', 'reveal').winnerNickname, 'a');
+  assert.equal(env.last('a', 'answerResult').correct, true);
 });
 
 test('어려움은 제목만 인정', () => {
@@ -93,10 +158,10 @@ test('어려움은 제목만 인정', () => {
   assert.equal(env.state().phase, ROOM_PHASE.ANSWERING);
   assert.equal(env.last('a', 'answerResult').correct, false);
   env.answer('b', env.round().song.titleAliases[0]);
-  assert.equal(env.last('b', 'reveal').winnerNickname, 'b');
+  assert.equal(env.last('b', 'answerResult').correct, true);
 });
 
-test('동시 도착: 먼저 처리된 정답이 이기고 나중 정답은 점수가 없다', () => {
+test('동시 도착: 모두 정답, 같은 시간이면 같은 점수이고 처리 순서대로 기록', () => {
   const env = createEnv();
   env.joinAll('a', 'b', 'c');
   env.begin();
@@ -107,9 +172,10 @@ test('동시 도착: 먼저 처리된 정답이 이기고 나중 정답은 점�
   env.answer('c', text);
   assert.equal(env.msgs('a', 'reveal').length, 1);
   const reveal = env.last('a', 'reveal');
-  assert.equal(reveal.winnerNickname, 'b');
-  assert.deepEqual(env.state().players.map((p) => p.score), [0, reveal.points, 0]);
-  assert.ok(env.state().players.every((p) => p.correct === (p.id === 'p2' ? 1 : 0)));
+  assert.deepEqual(env.correctNames(reveal), ['b', 'a', 'c']);
+  const points = reveal.correctPlayers[0].points;
+  assert.ok(reveal.correctPlayers.every((c) => c.elapsed === 2 && c.points === points));
+  assert.ok(env.state().players.every((p) => p.score === points && p.correct === 1));
 });
 
 test('정답 도착 시각은 서버가 잰다(클라이언트가 보낸 시간은 무시)', () => {
@@ -118,7 +184,7 @@ test('정답 도착 시각은 서버가 잰다(클라이언트가 보낸 시간�
   env.begin();
   env.timers.advance(10_000);
   env.send('a', { type: 'answer', roundId: env.round().id, text: env.correctText(), elapsed: 0.1, at: 0 });
-  assert.equal(env.last('b', 'reveal').elapsed, 10);
+  assert.equal(env.last('a', 'answerResult').elapsed, 10);
 });
 
 test('오답: 비공개 결과만 본인에게, 3번 소진하면 본인만 잠기고 locked 공지', () => {
@@ -142,7 +208,7 @@ test('오답: 비공개 결과만 본인에게, 3번 소진하면 본인만 잠�
   env.answer('a', env.correctText());
   assert.equal(env.state().phase, ROOM_PHASE.ANSWERING);
   env.answer('b', env.correctText());
-  assert.equal(env.last('b', 'reveal').winnerNickname, 'b');
+  assert.deepEqual(env.correctNames(env.last('b', 'reveal')), ['b']);
 });
 
 test('답 도배 제한: 플레이어당 1초 간격, 제한된 시도는 기회를 깎지 않는다', () => {
@@ -187,9 +253,8 @@ test('패스: 본인만 잠기고 다른 사람은 계속, 전원 포기하면 �
   env.send('c', { type: 'pass', roundId: 1 });
   assert.equal(env.state().phase, ROOM_PHASE.REVEALED);
   const reveal = env.last('a', 'reveal');
-  assert.equal(reveal.reason, 'exhausted');
-  assert.equal(reveal.winnerId, null);
-  assert.equal(reveal.points, 0);
+  assert.equal(reveal.reason, 'done');
+  assert.deepEqual(reveal.correctPlayers, []);
   assert.ok(env.state().players.every((p) => p.score === 0));
 });
 
@@ -203,7 +268,7 @@ test('전원 포기·오답 소진이 섞여도 남은 사람이 없으면 공�
     env.timers.advance(1000);
   }
   assert.equal(env.state().phase, ROOM_PHASE.REVEALED);
-  assert.equal(env.last('b', 'reveal').reason, 'exhausted');
+  assert.equal(env.last('b', 'reveal').reason, 'done');
 });
 
 test('시간 만료(랜덤듣기): 구간 + 답변 시간 뒤 공개, 모두 0점', () => {
@@ -217,7 +282,7 @@ test('시간 만료(랜덤듣기): 구간 + 답변 시간 뒤 공개, 모두 0�
   assert.equal(env.state().phase, ROOM_PHASE.REVEALED);
   const reveal = env.last('a', 'reveal');
   assert.equal(reveal.reason, 'timeout');
-  assert.equal(reveal.winnerId, null);
+  assert.deepEqual(reveal.correctPlayers, []);
   assert.ok(env.state().players.every((p) => p.score === 0));
   // 만료 뒤의 답은 무시
   env.answer('a', env.correctText());
@@ -237,7 +302,9 @@ test('전체듣기: 제한시간 30초, 점수는 개인전 공식', () => {
   env.readyAll();
   env.timers.advance(3000 + 7500);
   env.answer('b', env.correctText());
-  assert.equal(env.last('a', 'reveal').points, 80); // 100 − 80 × 7.5/30
+  assert.equal(env.last('b', 'answerResult').points, 80); // 100 − 80 × 7.5/30
+  env.passRest();
+  assert.equal(env.last('a', 'reveal').correctPlayers[0].points, 80);
 
   env.timers.advance(8000); // 다음 라운드: 시간 만료
   env.readyAll();
@@ -272,6 +339,7 @@ test('늦게 도착한 이전 라운드 메시지는 다음 라운드에 영향�
   env.begin();
   const firstRound = env.round().id;
   env.answer('a', env.correctText());
+  env.passRest();
   env.timers.advance(8000); // 다음 라운드 준비
   assert.notEqual(env.round().id, firstRound);
   env.send('b', { type: 'ready', roundId: firstRound });
@@ -289,6 +357,7 @@ test('자동 진행: 공개 8초 뒤 다음 라운드, reveal에 다음 곡 vide
   env.begin();
   const first = env.round().song.videoId;
   env.answer('a', env.correctText());
+  env.passRest();
   const reveal = env.last('a', 'reveal');
   assert.equal(reveal.hasNext, true);
   assert.ok(reveal.nextVideoId && reveal.nextVideoId !== first);
@@ -330,7 +399,8 @@ test('쉬움: 보기 문구만 보내고, 번호로 답하며, 같은 보기는 
   env.send('a', { type: 'answer', roundId: 1, text: song.title }); // 객관식에서 텍스트는 무시
   assert.equal(env.state().phase, ROOM_PHASE.ANSWERING);
   choose('b', correctIndex);
-  assert.equal(env.last('a', 'reveal').winnerNickname, 'b');
+  assert.equal(env.last('b', 'answerResult').correct, true);
+  assert.equal(env.state().phase, ROOM_PHASE.ANSWERING, 'a는 계속 고를 수 있다');
 });
 
 test('준비 10초 안에 ready가 없으면 그 사람만 제외하고 시작 신호', () => {
@@ -349,6 +419,7 @@ test('준비 10초 안에 ready가 없으면 그 사람만 제외하고 시작 �
   env.answer('c', env.correctText());
   assert.equal(env.state().phase, ROOM_PHASE.ANSWERING);
   env.answer('a', env.correctText());
+  env.passRest();
   const reveal = env.last('a', 'reveal');
   assert.deepEqual(reveal.excluded, [{ playerId: 'p3', reason: 'timeout', code: null }]);
 });
@@ -378,6 +449,7 @@ test('일부만 재생 오류: 그 사람만 제외하고 진행(0점, 공개에
   assert.equal(env.state().phase, ROOM_PHASE.STARTING);
   env.timers.advance(3000);
   env.answer('b', env.correctText());
+  env.passRest();
   const reveal = env.last('c', 'reveal');
   assert.deepEqual(reveal.excluded, [{ playerId: 'p3', reason: 'error', code: 150 }]);
   assert.equal(env.state().players[2].score, 0);
@@ -417,6 +489,7 @@ test('과반이 재생 오류: 곡 교체 + 새 roundId로 다시 준비, 점수
   env.readyAll();
   env.timers.advance(3000);
   env.answer('a', env.round().song.title);
+  env.passRest();
   assert.equal(env.last('a', 'reveal').roundId, 2);
 });
 
@@ -439,6 +512,7 @@ test('곡 교체 후 남은 곡이 없으면 지금까지의 라운드로 마친
   env.send('a', { type: 'settings', settings: { rounds: 5 } });
   env.begin();
   env.answer('a', env.correctText());
+  env.passRest();
   env.timers.advance(8000); // 2라운드 준비
   assert.equal(env.round().id, 2);
   env.send('a', { type: 'playerError', roundId: 2, code: 150 });
@@ -493,6 +567,7 @@ test('여러 라운드에 걸쳐 점수가 쌓이고 타이머가 남지 않는�
     env.readyAll();
     env.timers.advance(3000 + 1000);
     env.answer(i === 1 ? 'b' : 'a', env.correctText());
+    env.passRest();
     env.timers.advance(8000);
   }
   assert.equal(env.state().phase, ROOM_PHASE.RESULTS);

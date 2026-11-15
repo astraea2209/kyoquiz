@@ -127,11 +127,12 @@ test('재접속 토큰: 점수를 유지하고 진행 중인 라운드는 쉬고
   env.joinAll('c');
   env.begin();
   env.answer('a', env.correctText()); // a가 1라운드 득점
+  env.send('c', { type: 'pass', roundId: env.round().id });
+  env.room.handleDisconnect('b'); // b가 빠지면 답할 사람이 없어 공개
+  assert.equal(env.state().players[1].connected, false);
+  assert.equal(env.state().phase, ROOM_PHASE.REVEALED);
   const aScore = env.state().players[0].score;
   assert.ok(aScore > 0);
-
-  env.room.handleDisconnect('b');
-  assert.equal(env.state().players[1].connected, false);
   env.timers.advance(30_000); // 유예(60초) 안
   assert.equal(env.state().players[1].left, false);
 
@@ -265,6 +266,7 @@ test('끝까지 진행: 순위·라운드별 기록, 방장이 같은 멤버로 
     env.readyAll();
     env.timers.advance(3000 + 2000);
     env.answer(w, env.correctText());
+    env.passRest();
     env.timers.advance(8000);
   }
   assert.equal(env.state().phase, ROOM_PHASE.RESULTS);
@@ -272,8 +274,8 @@ test('끝까지 진행: 순위·라운드별 기록, 방장이 같은 멤버로 
   assert.equal(over.reason, 'complete');
   assert.deepEqual(over.ranking.map((r) => [r.nickname, r.rank, r.correct]), [['a', 1, 3], ['b', 2, 1], ['c', 2, 1]]);
   assert.equal(over.history.length, 5);
-  assert.deepEqual(over.history.map((h) => h.winnerNickname), ['a', 'a', 'b', 'c', 'a']);
-  assert.ok(over.history.every((h) => h.elapsed === 2 && h.points > 0));
+  assert.deepEqual(over.history.map((h) => env.correctNames(h)), [['a'], ['a'], ['b'], ['c'], ['a']]);
+  assert.ok(over.history.every((h) => h.correctPlayers[0].elapsed === 2 && h.correctPlayers[0].points > 0));
 
   // 같은 멤버로 한 판 더: 점수 초기화
   env.send('b', { type: 'start' });
@@ -298,6 +300,7 @@ test('다시 시작 전에 나간 사람은 정리된다', () => {
       env.timers.advance(3000);
     }
     env.answer('a', env.correctText());
+    env.passRest();
     env.timers.advance(8000);
   }
   assert.equal(env.state().phase, ROOM_PHASE.RESULTS);
