@@ -14,3 +14,7 @@ npm-debug.log*
 
 # Claude Code 개인 설정(공유 설정 .claude/settings.json은 커밋)
 .claude/settings.local.json
+
+# Cloudflare Wrangler 로컬 상태
+.wrangler/
+.dev.vars

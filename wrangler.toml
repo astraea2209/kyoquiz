@@ -1,0 +1,17 @@
+# Cloudflare Workers + Durable Objects 설정. 실행: npm run server:dev, 배포: npm run server:deploy
+name = "anime-song-quiz-rooms"
+main = "server/index.js"
+compatibility_date = "2025-06-01"
+
+[vars]
+# 허용할 사이트 주소(쉼표로 구분). 배포 때 정적 페이지 주소로 좁힌다. "*"는 제한 없음
+ALLOWED_ORIGINS = "*"
+
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "RoomDO"
+
+# 무료 플랜은 SQLite 저장 방식(new_sqlite_classes)만 쓸 수 있다
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RoomDO"]

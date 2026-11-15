@@ -35,9 +35,11 @@
 - `js/linkParser.js`: YouTube 링크에서 videoId와 `t=` 시작 시간 추출
 - `js/songs.js`: 곡 스키마, songs.json과 localStorage 병합, 영상 길이 캐시, 최고 점수, 설정 저장
 - `songs.json`: 기본 곡 목록(유명 애니 OP 12곡, 공식 채널 영상 위주). 제목은 한국어 표기, 원제·로마자·영어는 별칭. `hookStart`는 아직 없음. `songs.sample.json`: 형식 예시(자리표시자 값)
-- `tests/`: 단위 테스트 파일 10개(가짜 플레이어·시계·타이머·소켓 포함)
+- `tests/`: 단위 테스트 파일 11개(가짜 플레이어·시계·타이머·소켓 포함)
 - 멀티플레이(친구와 대결, 선착순) 핵심부. 설계는 Claude Docs 문서 "애니송 맞추기 멀티플레이 기획서"(https://claude.ai/artifact/3BLyVFbGYGhL7hk2pjG7SM). 서버 런타임과 멀티 화면에 의존하지 않는 부분만 구현됨:
   - `server/room.js`: `Room` 방 상태 머신(대기실→준비→시작 대기→답변→공개→결과). 시계(`now`), 난수(`rng`), 타이머(`timers`), 전송(`send(connId, msg)`), 토큰 생성(`genToken`)을 주입받는다. 어댑터는 `handleMessage(connId, msg)`와 `handleDisconnect(connId)`만 부르면 된다. 판정·구간 선택·점수는 `js/judge.js`, `js/segment.js`, `js/scoring.js`를 그대로 import. 시간·한도 상수는 `ROOM_CONFIG`(생성 때 `config`로 덮어쓰기)
+  - `server/roomHost.js`: `RoomHost`. Room을 소켓({send, close})에 연결하는 런타임 무관 계층(JSON 파싱, 메시지 크기 2KB·빈도 40개/5초 제한, join 10초 제한, 빈 방 60초 뒤 닫기, 방이 닫히면 소켓 정리)
+  - `server/index.js`: Cloudflare Workers + Durable Objects 진입점. `POST /api/rooms`(방 생성), `GET /ws?code=`(WebSocket), `GET /api/health`. 방 하나 = `RoomDO` 하나, 상태는 메모리에만 있다(재배포·재시작하면 진행 중인 방이 사라짐). `songs.json`을 번들로 가져다 쓴다. `wrangler.toml`: Durable Object 바인딩(`ROOMS`)과 `ALLOWED_ORIGINS`(허용 사이트)
   - `js/online/net.js`: 시계 차이 계산(순수 함수와 `ClockSync`). WebSocket 연결·재접속은 아직 없음
   - `js/online/playback.js`: `OnlinePlayback` 재생 제어(prepare→ready→go→reveal). 플레이어 2개 교대, 플레이어·시계·타이머·전송 주입
   - `tests/fakeTimers.js`, `tests/roomHelpers.js`: 시계와 연동된 가짜 타이머, 가짜 소켓 환경
@@ -65,7 +67,7 @@
 
 ## 검증 현황
 
-- 확인함: 단위 테스트 140개 통과(개인전 59개 + 멀티 81개), 모든 JS 파일 `node --check` 통과, 가짜 YT 객체를 넣은 헤드리스 Chrome에서 곡 추가부터 결과 화면까지의 흐름, 실제 브라우저에서 YouTube 재생과 소리·영상(사용자 확인), songs.json 12곡 모두 localhost에서 임베드 재생 오류 없음(2026-11-15)
+- 확인함: 단위 테스트 151개 통과(개인전 59개 + 멀티 92개), 모든 JS 파일 `node --check` 통과, 가짜 YT 객체를 넣은 헤드리스 Chrome에서 곡 추가부터 결과 화면까지의 흐름, 실제 브라우저에서 YouTube 재생과 소리·영상(사용자 확인), songs.json 12곡 모두 localhost에서 임베드 재생 오류 없음(2026-11-15)
 - 실제 YouTube로 확인함(데스크톱 Chromium, 2026-11-15):
   - 0초 소리 누출 없음. iframe의 infoDelivery 메시지로 기록해 보니, 길이를 모르는 5곡 모두 0초 부근에서는 음소거였고 unMute는 구간 시작 위치에서만 일어났다. 3초 구간은 약 3.1초 재생
   - 오버레이는 공개 전까지 무대 전체를 가리고, 공개 때만 현재 플레이어가 보인다. controls=0이라 공개 중에도 제목 표시줄은 안 보임
@@ -74,8 +76,10 @@
 
 ## 멀티플레이 구현 현황 (feature 브랜치 claude/multiplayer-core-1e3c9b)
 
-- 완료(가짜 시계·소켓·플레이어 테스트까지): 방 상태 머신, 점수(SCORING.multi), 시계 오프셋, 재생 제어
-- 미구현: `server/index.js`(WebSocket 어댑터, 서버 런타임 미정), `js/online/net.js`의 WebSocket 연결·재접속, 멀티 화면(`js/online/ui.js`), 시작 화면의 진입 버튼, 배포
+- 서버 런타임은 Cloudflare Workers + Durable Objects로 정함(사용자 결정). 서버 실행: `npm run server:dev`(= `npx wrangler dev`, 포트 8787), 배포: `npm run server:deploy`. wrangler는 npx로 그때그때 받아 쓰며 package.json 의존성에는 넣지 않는다
+- 완료(가짜 시계·소켓·플레이어 테스트까지): 방 상태 머신, 점수(SCORING.multi), 시계 오프셋, 재생 제어, 소켓 호스트 계층, Workers/Durable Object 어댑터
+- 완료(실제 확인): `wrangler dev`(로컬 workerd)에서 Node WebSocket 클라이언트 2개로 방 생성, 입장, ping/pong, 설정, 시작, ready, go(3초 뒤), 오답·정답, reveal, 끊김 후 토큰 재접속, 전원 퇴장 후 방 닫힘까지 한 라운드를 확인(2026-11-15). 스모크 스크립트는 저장소에 없다
+- 미구현: `js/online/net.js`의 WebSocket 연결·재접속(클라이언트), 멀티 화면(`js/online/ui.js`), 시작 화면의 진입 버튼, 실제 Cloudflare 배포(계정·`wrangler login` 필요)
 - 실제 브라우저·기기로 확인하지 못함: 시작 신호 소리 시각 오차(브라우저 2개 이상에서 infoDelivery로 측정 필요), 모바일 자동 진행
 - 서버 규칙 중 코드에서 정한 것(문서에 없던 세부): 오류 과반(절반 초과) 판정은 준비 단계에서만 곡 교체, 시작 신호 뒤 오류는 그 사람만 제외. ready 시간 초과로 아무도 준비하지 못해도 곡 교체. 대기실에서도 끊기면 60초 유예 뒤 퇴장(새로고침 대비). 결과 화면에서 새 입장 허용. 랜덤듣기는 `duration`이 없는 곡을 제외(songs.json에 `duration`을 채워야 함). 시작 신호는 `go` 전송 3초 뒤. 전원 이탈 시 방은 유예(60초)가 끝나면 닫힘(`onClose`)
 - 프로토콜: 클라이언트 `join/settings/start/ready/answer/pass/playerError/ping/leave`, 서버 `joined/state/prepare/go/locked/answerResult/rateLimited/reveal/gameOver/notice/error/pong/kicked`. 주의: 문서의 메시지 표에 없던 `joined`(토큰 전달), `answerResult`(본인에게만 오답 결과), `rateLimited`, `notice`, `pong`, `kicked`, `leave`를 추가했다. `reveal`에 `nextVideoId`가 있어 다음 곡을 cue한다
@@ -86,7 +90,7 @@
 2. 난이도, 구간 길이, 별칭 매칭 다듬기
 3. 곡 등록 도구 보강(목록 정기 점검, 삭제·차단된 영상 정리)
 4. 확장 모드(작품명 맞추기, 서바이벌, 타임어택)
-5. 친구와 대결 이어서(위 멀티 구현 현황 참고): 서버 런타임 결정 → `server/index.js` 어댑터 → `js/online/net.js` WebSocket·재접속 → `js/online/ui.js` 화면 → 실기기 동기화 측정 → 배포
+5. 친구와 대결 이어서(위 멀티 구현 현황 참고): `songs.json`에 `duration` 채우기 → `js/online/net.js` WebSocket·재접속 → `js/online/ui.js` 화면 → 실기기 동기화 측정 → 배포
 
 ## 미결정 사항
 
@@ -94,4 +98,4 @@
 - 첫 버전에 등록할 곡 수와 등록 담당
 - 영상 가리기가 YouTube API 서비스 약관에 맞는지(공개나 수익화 전에 약관 직접 확인)
 - 모바일을 1차 범위에 포함할지, 멀티플레이 도입 시점
-- 멀티플레이 관련(문서 "리스크와 열린 질문"): 서버 런타임(Cloudflare Durable Objects 또는 Node `ws`)과 `server/`에 npm 패키지 원칙 적용 여부, 멀티용 곡 목록(정적 songs.json 공유 vs 서버 전용)과 `duration` 채우기, 모바일 자동 진행, 시작 신호 오차 허용 범위(실측 후), 다시듣기 없음 확인, 운영 한도(최대 인원, 동시 방 수), 모두 풀기 모드, YouTube 약관 확인
+- 멀티플레이 관련(문서 "리스크와 열린 질문"): `server/`에 npm 패키지 원칙 적용 여부(지금은 wrangler를 npx로만 사용), 멀티용 곡 목록(정적 songs.json 공유 vs 서버 전용)과 `duration` 채우기, 모바일 자동 진행, 시작 신호 오차 허용 범위(실측 후), 다시듣기 없음 확인, 운영 한도(최대 인원, 동시 방 수), 모두 풀기 모드, YouTube 약관 확인
