@@ -4,7 +4,7 @@
 
 ## 명령어
 
-- 실행: 이 폴더에서 `python -m http.server 8000` 후 http://localhost:8000 (Windows에서 python이 안 되면 `py -m http.server 8000` 또는 VS Code Live Server)
+- 실행: Windows는 `start.bat` 더블클릭(서버 + 브라우저, 배포 서버용 `?server=` 포함, `.gitattributes`로 CRLF 유지). 직접 하려면 이 폴더에서 `python -m http.server 8000` 후 http://localhost:8000 (Windows에서 python이 안 되면 `py -m http.server 8000` 또는 VS Code Live Server)
 - 테스트: `node --test` (또는 `npm test`). 의존성 설치 없음
 - 곡 점검: `node tools/check-songs.mjs` (또는 `npm run check-songs`). 곡마다 한 줄(정상/경고/문제)과 요약만 출력, 문제가 있으면 exit 1. `--write`는 `duration`이 없거나 2초 넘게 틀린 곡을 실제 길이로 고쳐 저장(필드 순서·형식 유지). 곡 확인은 YouTube 검색 HTML을 직접 받지 말고 이 스크립트로 한다(토큰 절약)
 - 곡 합치기: `node tools/merge-songs.mjs 친구1.json [친구2.json ...] [--into songs.json] [--write]`. 친구가 곡 관리의 "내 곡만 내보내기"로 보낸 파일에서 songs.json에 없는 videoId만 끝에 추가(기존 곡은 안 바꾸고 다른 필드만 보고, 파일끼리 중복은 앞 파일 우선, id 충돌은 videoId로 바꿈). 기본은 보기만, `--write`로 저장. 합친 뒤 `check-songs --write`
