@@ -8,6 +8,8 @@ import {
   createMemoryStorage,
   parseSongList,
 } from './songs.js';
+import { roomCodeFromSearch } from './online/config.js';
+import { OnlineApp } from './online/ui.js';
 import { App } from './ui.js';
 
 function getStorage() {
@@ -30,6 +32,13 @@ const app = new App({
   highScores: new HighScores(storage),
 });
 app.init();
+
+// 친구와 대결(멀티플레이). 플레이어는 처음 입장할 때 따로 만든다.
+const online = new OnlineApp({ app, createPlayer: createYouTubePlayer, storage, location: window.location });
+online.init();
+document.querySelector('[data-action="open-online"]').addEventListener('click', () => online.open());
+const invitedRoom = roomCodeFromSearch(window.location.search);
+if (invitedRoom) online.open({ code: invitedRoom });
 
 fetch('songs.json', { cache: 'no-cache' })
   .then((res) => {

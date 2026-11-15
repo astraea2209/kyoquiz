@@ -44,6 +44,13 @@ export class ClockSync {
     this.synced = false;
   }
 
+  /** 다른 서버·방에 새로 연결할 때 표본을 비운다 */
+  reset() {
+    this.samples = [];
+    this.offset = 0;
+    this.synced = false;
+  }
+
   /** ping을 보낼 때 호출. 돌려준 값을 pong 처리까지 들고 있다가 addPong에 넘긴다 */
   startPing() {
     return { sentAt: this.localNow() };

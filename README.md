@@ -40,6 +40,19 @@ python -m http.server 8000      # 또는 python3 -m http.server 8000
 - 가장 간단한 방법: <https://app.netlify.com/drop> 에 폴더를 끌어다 놓습니다.
 - 저장소를 연결할 때는 Build command를 비우고 Publish directory를 이 폴더로 지정합니다.
 
+## 친구와 대결 (멀티플레이)
+
+방 코드로 모인 2~8명이 같은 곡을 같은 순간에 듣고 먼저 맞히는 사람이 점수를 가져갑니다. 방과 판정은 서버(Cloudflare Workers + Durable Objects)가 맡으므로 서버를 따로 켜야 합니다.
+
+```bash
+npm run server:dev        # 로컬 서버(http://localhost:8787). wrangler를 npx로 내려받아 실행
+python -m http.server 8000   # 정적 페이지는 평소처럼
+```
+
+http://localhost:8000 에서 "친구와 대결"을 누르면 로컬 서버에 자동으로 연결됩니다. 같은 컴퓨터의 탭 두 개로 혼자 시험해 볼 수 있습니다. 랜덤듣기는 서버가 곡 길이를 알아야 하므로 `songs.json`의 곡에 `duration`(초)을 채워야 하고, 채우기 전에는 전체듣기만 됩니다.
+
+배포하면 Worker 주소를 `js/online/config.js`의 `DEFAULT_SERVER_URL`에 넣고(또는 주소 끝에 `?server=https://…`), `wrangler.toml`의 `ALLOWED_ORIGINS`를 정적 페이지 주소로 좁히세요. 배포는 `npm run server:deploy`(Cloudflare 계정과 `npx wrangler login` 필요)입니다.
+
 ## 곡 등록
 
 ### 앱 안에서 (곡 관리 화면)

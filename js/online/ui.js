@@ -1,0 +1,661 @@
+// 온라인 대결 화면(입장, 대기실, 게임, 결과). 규칙은 서버가, 상태 정리는 session.js가 맡고 여기는 DOM만 다룬다.
+// 화면 전환은 기존 App.showScreen을 그대로 쓴다(data-screen 이름: online-entry/lobby/game/result).
+
+import { MODE } from '../game.js';
+import { DIFFICULTY } from '../judge.js';
+import { SCORING } from '../scoring.js';
+import { RoomConnection } from './connection.js';
+import { buildInviteLink, resolveServerUrl, roomsUrl, webSocketUrl } from './config.js';
+import { ClockSync } from './net.js';
+import { OnlinePlayback, PLAYBACK_STAGE } from './playback.js';
+import { OnlineSession } from './session.js';
+
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+
+const MODE_LABEL = { [MODE.RANDOM]: '랜덤듣기', [MODE.FULL]: '전체듣기' };
+const DIFFICULTY_LABEL = { [DIFFICULTY.EASY]: '쉬움', [DIFFICULTY.NORMAL]: '보통', [DIFFICULTY.HARD]: '어려움' };
+const STATUS_CHIP = {
+  passed: '포기',
+  exhausted: '기회 소진',
+  error: '재생 오류',
+  timeout: '준비 지연',
+  absent: '쉬는 중',
+};
+const REASON_TEXT = {
+  timeout: '시간 초과 — 아무도 맞히지 못했어요',
+  exhausted: '모두 포기하거나 기회를 다 썼어요',
+};
+const GAME_OVER_NOTE = {
+  'not-enough-players': '남은 인원이 부족해 게임을 마쳤습니다.',
+  'no-playable': '재생할 수 있는 곡이 없어 게임을 진행하지 못했습니다.',
+};
+// 이 이유로 닫힐 때는 서버가 보낸 오류 메시지를 이미 보여 줬다
+const QUIET_CLOSE = ['left', 'game-started', 'room-full', 'bad-nickname'];
+const CLOSE_TEXT = {
+  kicked: '다른 탭에서 같은 방에 입장해 이 연결은 종료됐습니다.',
+  'gave-up': '서버와 연결이 오래 끊겨 방에서 나갔습니다.',
+  'room-closed': '방이 닫혔습니다.',
+  'rate-limit': '메시지를 너무 빨리 보내 연결이 끊겼습니다.',
+};
+
+const NICKNAME_KEY = 'asq.nickname';
+const SESSION_KEY = 'asq.online';
+
+function el(tag, props = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(props)) {
+    if (key === 'class') node.className = value;
+    else if (key === 'text') node.textContent = value;
+    else if (key.startsWith('on')) node.addEventListener(key.slice(2), value);
+    else if (value === true) node.setAttribute(key, '');
+    else if (value !== false && value != null) node.setAttribute(key, value);
+  }
+  node.append(...children);
+  return node;
+}
+
+function safe(fn, fallback = null) {
+  try {
+    return fn();
+  } catch {
+    return fallback;
+  }
+}
+
+/** 설정 그룹 정의: [키, 라벨, [[값, 라벨], …]] */
+const SETTING_GROUPS = [
+  ['mode', '모드', [[MODE.RANDOM, '랜덤듣기'], [MODE.FULL, '전체듣기']]],
+  ['clipLength', '구간 길이', SCORING.clipLengths.map((n) => [n, `${n}초`])],
+  ['answerTime', '답변 시간', SCORING.multi.answerTimes.map((n) => [n, `${n}초`])],
+  ['rounds', '라운드', SCORING.roundOptions.map((n) => [n, `${n}`])],
+  ['difficulty', '난이도', [[DIFFICULTY.EASY, '쉬움'], [DIFFICULTY.NORMAL, '보통'], [DIFFICULTY.HARD, '어려움']]],
+];
+
+export class OnlineApp {
+  /**
+   * @param {object} opts
+   * @param {object} opts.app  기존 App(showScreen, toast 사용)
+   * @param {(element: string) => Promise<object>} opts.createPlayer  YouTube 플레이어 생성(js/player.js)
+   * @param {Storage} opts.storage  localStorage(닉네임·서버 주소)
+   * @param {Location} opts.location
+   */
+  constructor({ app, createPlayer, storage, location }) {
+    this.app = app;
+    this.createPlayer = createPlayer;
+    this.storage = storage;
+    this.location = location;
+    this.serverUrl = resolveServerUrl({ search: location.search, hostname: location.hostname, storage });
+    this.clock = new ClockSync();
+    this.players = null;
+    this.playback = null;
+    this.connection = null;
+    this.session = null;
+    this.busy = false;
+    this.joined = false;
+    this.renderedRoundId = null;
+    this.ticker = null;
+  }
+
+  init() {
+    const root = document.body;
+    const toasts = $('#toasts');
+    for (const section of [this.buildEntry(), this.buildLobby(), this.buildGame(), this.buildResult()]) {
+      root.insertBefore(section, toasts);
+    }
+    root.insertBefore(
+      el('div', { id: 'on-conn-banner', class: 'banner warn conn-banner', hidden: true, role: 'status', text: '연결이 끊겼어요. 다시 연결하는 중…' }),
+      $('#screen-start'),
+    );
+    this.bindEntry();
+  }
+
+  // ---------- 진입 ----------
+  /** 시작 화면의 "친구와 대결" 버튼, 또는 초대 링크(?room=)로 들어왔을 때 */
+  open({ code = null } = {}) {
+    this.app.showScreen('online-entry');
+    const saved = this.savedSession();
+    if (code) $('#on-code').value = code;
+    this.renderEntry();
+    // 새로고침 등으로 끊겼던 같은 방이면 저장된 토큰으로 바로 돌아간다
+    if (saved && code && saved.code === code && saved.server === this.serverUrl) {
+      this.enter({ code, nickname: saved.nickname, token: saved.token });
+    }
+  }
+
+  savedSession() {
+    return safe(() => JSON.parse(sessionStorage.getItem(SESSION_KEY)));
+  }
+
+  saveSession(data) {
+    safe(() => sessionStorage.setItem(SESSION_KEY, JSON.stringify(data)));
+  }
+
+  clearSession() {
+    safe(() => sessionStorage.removeItem(SESSION_KEY));
+  }
+
+  buildEntry() {
+    return el(
+      'section',
+      { id: 'screen-online-entry', class: 'screen', 'data-screen': 'online-entry', hidden: true },
+      el('div', { class: 'manage-header' }, el('h1', { text: '친구와 대결' }), el('button', { type: 'button', class: 'btn small', id: 'on-entry-back', text: '← 시작 화면' })),
+      el('p', { class: 'sub', text: '방을 만들고 코드나 링크를 공유하면 친구들이 들어옵니다. 같은 곡을 동시에 듣고 먼저 맞히는 사람이 점수를 가져가요.' }),
+      el('label', { class: 'field' }, '닉네임', el('input', { id: 'on-nickname', maxlength: '12', autocomplete: 'off', placeholder: '최대 12글자' })),
+      el('div', { class: 'actions' }, el('button', { type: 'button', class: 'btn primary big', id: 'on-create', text: '방 만들기' })),
+      el('h2', { text: '코드로 입장' }),
+      el(
+        'form',
+        { id: 'on-join-form', class: 'answer-form', autocomplete: 'off' },
+        el('input', { id: 'on-code', maxlength: '5', autocapitalize: 'characters', placeholder: '방 코드 5자리', 'aria-label': '방 코드' }),
+        el('button', { type: 'submit', class: 'btn primary', id: 'on-join', text: '입장' }),
+      ),
+      el('p', { class: 'status', id: 'on-entry-status', role: 'status' }),
+    );
+  }
+
+  bindEntry() {
+    const nickname = $('#on-nickname');
+    nickname.value = safe(() => this.storage.getItem(NICKNAME_KEY), '') ?? '';
+    $('#on-entry-back').addEventListener('click', () => this.app.showScreen('start'));
+    $('#on-create').addEventListener('click', () => this.enter({ create: true, nickname: nickname.value }));
+    $('#on-join-form').addEventListener('submit', (event) => {
+      event.preventDefault();
+      this.enter({ code: $('#on-code').value.trim().toUpperCase(), nickname: nickname.value });
+    });
+    $('#on-code').addEventListener('input', (event) => {
+      event.target.value = event.target.value.toUpperCase();
+    });
+  }
+
+  renderEntry(status = null) {
+    const configured = !!this.serverUrl;
+    $('#on-create').disabled = !configured || this.busy;
+    $('#on-join').disabled = !configured || this.busy;
+    $('#on-entry-status').textContent =
+      status ??
+      (configured
+        ? ''
+        : '서버 주소가 설정되지 않았습니다. js/online/config.js의 DEFAULT_SERVER_URL을 채우거나 주소 끝에 ?server=https://… 를 붙여 열어 주세요.');
+  }
+
+  // ---------- 연결 ----------
+  async ensurePlayers() {
+    if (this.playback) return;
+    const results = await Promise.allSettled([this.createPlayer('online-player-0'), this.createPlayer('online-player-1')]);
+    const players = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
+    if (!players.length) throw new Error('YouTube 플레이어를 준비하지 못했습니다. 인터넷 연결을 확인해 주세요.');
+    this.players = players;
+    this.playback = new OnlinePlayback({
+      players,
+      clock: this.clock,
+      send: (message) => this.connection?.send(message),
+    });
+    this.playback.onChange(() => this.render());
+  }
+
+  /** 입장 버튼 클릭 안에서 시작한다(소리 켜기를 위한 사용자 동작 확보) */
+  async enter({ create = false, code = null, nickname = '', token = null }) {
+    if (this.busy) return;
+    const name = String(nickname ?? '').trim();
+    if (!name) {
+      this.app.toast('닉네임을 입력해 주세요.');
+      return;
+    }
+    if (!create && !/^[A-HJ-NP-Z2-9]{5}$/.test(code ?? '')) {
+      this.app.toast('방 코드 5자리를 입력해 주세요.');
+      return;
+    }
+    safe(() => this.storage.setItem(NICKNAME_KEY, name));
+    this.busy = true;
+    this.renderEntry('연결 중…');
+    try {
+      await this.ensurePlayers();
+      if (create) {
+        const res = await fetch(roomsUrl(this.serverUrl), { method: 'POST' });
+        if (!res.ok) throw new Error('방을 만들지 못했습니다. 잠시 뒤 다시 시도해 주세요.');
+        code = (await res.json()).code;
+      }
+      this.connect({ code, nickname: name, token });
+    } catch (error) {
+      this.busy = false;
+      this.renderEntry();
+      this.app.toast(error.message || '연결하지 못했습니다.');
+    }
+  }
+
+  connect({ code, nickname, token }) {
+    this.teardownConnection();
+    this.clock.reset();
+    this.joined = false;
+    this.renderedRoundId = null;
+    const connection = new RoomConnection({ url: webSocketUrl(this.serverUrl, code), clock: this.clock });
+    const session = new OnlineSession({ connection, playback: this.playback, clock: this.clock });
+    this.connection = connection;
+    this.session = session;
+    session.on('change', () => this.render());
+    session.on('notice', (message) => this.app.toast(message));
+    session.on('error', (message) => this.app.toast(message.message || '요청을 처리하지 못했습니다.'));
+    connection.on('message', (message) => {
+      if (message.type === 'joined') this.handleJoined(message, nickname);
+    });
+    connection.on('status', ({ status, reason }) => this.handleStatus(status, reason));
+    connection.connect(nickname, token);
+  }
+
+  handleJoined(message, nickname) {
+    this.joined = true;
+    this.busy = false;
+    this.saveSession({ server: this.serverUrl, code: message.code, nickname, token: this.connection.token });
+    // 새로고침해도 같은 방으로 돌아올 수 있게 주소에 방 코드를 남긴다
+    safe(() => history.replaceState(null, '', buildInviteLink(this.location, message.code)));
+    this.render();
+  }
+
+  handleStatus(status, reason) {
+    $('#on-conn-banner').hidden = status !== 'reconnecting';
+    if (status !== 'closed') return;
+    const wasJoined = this.joined;
+    if (reason === 'left') return;
+    this.teardownConnection();
+    this.busy = false;
+    if (!QUIET_CLOSE.includes(reason)) {
+      this.app.toast(CLOSE_TEXT[reason] ?? (wasJoined ? '연결이 종료되었습니다.' : '방에 연결하지 못했습니다. 방 코드와 서버 주소를 확인해 주세요.'));
+    }
+    this.clearSession();
+    this.app.showScreen(wasJoined ? 'start' : 'online-entry');
+    if (!wasJoined) this.renderEntry();
+  }
+
+  teardownConnection() {
+    this.stopTicker();
+    this.session?.dispose();
+    this.connection?.close?.();
+    this.playback?.stop();
+    this.session = null;
+    this.connection = null;
+    $('#on-conn-banner').hidden = true;
+  }
+
+  leave({ ask = false } = {}) {
+    if (ask && !confirm('방에서 나갈까요?')) return;
+    this.session?.leave();
+    this.clearSession();
+    this.teardownConnection();
+    this.joined = false;
+    safe(() => history.replaceState(null, '', this.location.pathname));
+    this.app.showScreen('start');
+  }
+
+  // ---------- 화면 전환 ----------
+  render() {
+    const session = this.session;
+    if (!session?.room || !this.joined) return;
+    const phase = session.phase;
+    const target = phase === 'lobby' ? 'online-lobby' : phase === 'results' ? 'online-result' : 'online-game';
+    if (this.app.screen !== target) this.app.showScreen(target);
+    if (target === 'online-game') this.startTicker();
+    else this.stopTicker();
+    if (target === 'online-lobby') this.renderLobby();
+    else if (target === 'online-result') this.renderResult();
+    else this.renderGame();
+  }
+
+  startTicker() {
+    if (this.ticker != null) return;
+    this.ticker = setInterval(() => this.renderGame(), 200);
+  }
+
+  stopTicker() {
+    if (this.ticker == null) return;
+    clearInterval(this.ticker);
+    this.ticker = null;
+  }
+
+  // ---------- 대기실 ----------
+  buildLobby() {
+    const groups = SETTING_GROUPS.map(([key, label, options]) =>
+      el(
+        'fieldset',
+        { class: 'segmented', id: `on-set-${key}` },
+        el('legend', { text: label }),
+        ...options.map(([value, text]) =>
+          el(
+            'label',
+            {},
+            el('input', {
+              type: 'radio',
+              name: `on-${key}`,
+              value: String(value),
+              onchange: () => this.session?.setSettings({ [key]: value }),
+            }),
+            el('span', { text }),
+          ),
+        ),
+      ),
+    );
+    return el(
+      'section',
+      { id: 'screen-online-lobby', class: 'screen', 'data-screen': 'online-lobby', hidden: true },
+      el('h1', { text: '대기실' }),
+      el(
+        'div',
+        { class: 'room-code-box' },
+        el('span', { class: 'sub', text: '방 코드' }),
+        el('strong', { id: 'on-room-code', class: 'room-code' }),
+        el('button', { type: 'button', class: 'btn small', id: 'on-copy', text: '초대 링크 복사', onclick: () => this.copyInvite() }),
+      ),
+      el('h2', { text: '참가자' }),
+      el('ul', { id: 'on-members', class: 'member-list' }),
+      el('h2', {}, '설정 ', el('span', { id: 'on-settings-note', class: 'sub' })),
+      el('div', { class: 'settings', id: 'on-settings' }, ...groups),
+      el('div', { class: 'actions' }, el('button', { type: 'button', class: 'btn primary big', id: 'on-start', text: '게임 시작', onclick: () => this.session?.start() })),
+      el('p', { class: 'status', id: 'on-lobby-hint' }),
+      el('div', { class: 'actions' }, el('button', { type: 'button', class: 'btn ghost', id: 'on-leave-lobby', text: '방 나가기', onclick: () => this.leave() })),
+    );
+  }
+
+  copyInvite() {
+    const link = buildInviteLink(this.location, this.session.code);
+    const done = () => this.app.toast('초대 링크를 복사했어요. 친구에게 보내 주세요.');
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(link).then(done, () => prompt('링크를 복사해 주세요', link));
+    else prompt('링크를 복사해 주세요', link);
+  }
+
+  renderLobby() {
+    const s = this.session;
+    const room = s.room;
+    $('#on-room-code').textContent = room.code;
+    $('#on-members').replaceChildren(
+      ...room.players
+        .filter((p) => !p.left)
+        .map((p) =>
+          el(
+            'li',
+            { class: p.connected ? '' : 'off' },
+            el('span', { class: 'name', text: p.nickname }),
+            p.isHost ? el('span', { class: 'chip host', text: '방장' }) : '',
+            p.id === s.you ? el('span', { class: 'chip me', text: '나' }) : '',
+            p.connected ? '' : el('span', { class: 'chip', text: '연결 끊김' }),
+          ),
+        ),
+    );
+    const isHost = s.isHost;
+    $('#on-settings-note').textContent = isHost ? '' : '(방장이 정합니다)';
+    for (const [key] of SETTING_GROUPS) {
+      const fieldset = $(`#on-set-${key}`);
+      const full = room.settings.mode === MODE.FULL;
+      fieldset.disabled = !isHost || ((key === 'clipLength' || key === 'answerTime') && full);
+      for (const input of $$('input', fieldset)) input.checked = input.value === String(room.settings[key]);
+    }
+    const connected = room.players.filter((p) => p.connected && !p.left).length;
+    const enough = connected >= SCORING.multi.minPlayers;
+    const start = $('#on-start');
+    start.hidden = !isHost;
+    start.disabled = !enough;
+    $('#on-lobby-hint').textContent = isHost
+      ? enough
+        ? '준비되면 시작하세요. 시작한 뒤에는 새로 입장할 수 없어요.'
+        : `${SCORING.multi.minPlayers}명 이상 모이면 시작할 수 있어요.`
+      : '방장이 시작하길 기다리는 중…';
+  }
+
+  // ---------- 게임 ----------
+  buildGame() {
+    return el(
+      'section',
+      { id: 'screen-online-game', class: 'screen keep-alive', 'data-screen': 'online-game' },
+      el(
+        'div',
+        { class: 'game-header' },
+        el('span', { id: 'on-round-label', class: 'pill' }),
+        el('span', { id: 'on-mode-label', class: 'pill muted' }),
+        el('span', { id: 'on-score-label', class: 'score' }),
+        el('button', { type: 'button', class: 'btn small ghost', id: 'on-quit', text: '나가기', onclick: () => this.leave({ ask: true }) }),
+      ),
+      el(
+        'div',
+        { class: 'stage' },
+        el('div', { class: 'player-slot', id: 'on-slot-0' }, el('div', { id: 'online-player-0' })),
+        el('div', { class: 'player-slot', id: 'on-slot-1' }, el('div', { id: 'online-player-1' })),
+        el(
+          'div',
+          { class: 'overlay', id: 'on-overlay' },
+          el('div', { class: 'eq', id: 'on-eq', 'aria-hidden': 'true' }, el('i'), el('i'), el('i'), el('i'), el('i')),
+          el('p', { id: 'on-overlay-text', class: 'overlay-text' }),
+        ),
+      ),
+      el('div', { class: 'progress', 'aria-label': '남은 시간' }, el('div', { class: 'progress-bar', id: 'on-progress-bar' })),
+      el('p', { class: 'progress-label', id: 'on-progress-label' }),
+      el('ul', { id: 'on-board', class: 'scoreboard' }),
+      el(
+        'div',
+        { id: 'on-answer-area' },
+        el('p', { class: 'attempts', id: 'on-attempts' }),
+        el('div', { class: 'choices', id: 'on-choices' }),
+        el(
+          'form',
+          { id: 'on-answer-form', class: 'answer-form', autocomplete: 'off', onsubmit: (event) => this.submitAnswer(event) },
+          el('input', { id: 'on-answer-input', type: 'text', enterkeyhint: 'done', placeholder: '곡 제목 또는 작품명', 'aria-label': '정답 입력' }),
+          el('button', { type: 'submit', class: 'btn primary', text: '제출' }),
+        ),
+        el('p', { class: 'feedback', id: 'on-feedback', role: 'status' }),
+        el('div', { class: 'controls' }, el('button', { type: 'button', class: 'btn ghost', id: 'on-pass', text: '패스', onclick: () => this.session?.pass() })),
+      ),
+      el(
+        'div',
+        { id: 'on-reveal', class: 'reveal', hidden: true },
+        el('p', { class: 'reveal-result', id: 'on-reveal-result' }),
+        el('h2', { id: 'on-reveal-title' }),
+        el('p', { id: 'on-reveal-anime' }),
+        el('p', { class: 'sub', id: 'on-reveal-excluded' }),
+        el('p', { class: 'sub', id: 'on-reveal-next' }),
+      ),
+    );
+  }
+
+  submitAnswer(event) {
+    event.preventDefault();
+    const input = $('#on-answer-input');
+    if (this.session?.submitText(input.value)) input.select();
+  }
+
+  buildChoices() {
+    const container = $('#on-choices');
+    container.replaceChildren();
+    const choices = this.session.round?.choices;
+    if (!choices) return;
+    choices.forEach((label, index) =>
+      container.append(el('button', { type: 'button', class: 'btn', text: label, onclick: () => this.session?.choose(index) })),
+    );
+  }
+
+  overlayText() {
+    const s = this.session;
+    const stage = this.playback.stage;
+    const status = s.me?.status;
+    if (s.phase === 'revealed') return '정답 공개';
+    if (s.phase === 'preparing') {
+      const { ready, total } = s.readyCount();
+      return status === 'absent' ? '다음 라운드부터 함께해요' : `곡을 불러오는 중… (${ready}/${total})`;
+    }
+    if (status === 'timeout') return '준비가 늦어 이번 라운드는 구경만 해요';
+    if (status === 'absent') return '다음 라운드부터 함께해요';
+    if (stage === PLAYBACK_STAGE.ERROR || status === 'error') return '재생 오류 — 이번 라운드는 제외돼요';
+    if (stage === PLAYBACK_STAGE.MISSED) return '시작을 놓쳤어요. 다른 사람의 정답을 기다려 주세요';
+    if (s.phase === 'starting') {
+      const left = s.countdownSeconds();
+      return left ? `${left}` : '시작!';
+    }
+    if (stage === PLAYBACK_STAGE.STOPPED) return '구간이 끝났어요. 답을 입력하세요';
+    return '재생 중';
+  }
+
+  feedbackText() {
+    const s = this.session;
+    const status = s.me?.status;
+    if (status === 'exhausted') return { text: '기회를 모두 썼어요. 다른 사람을 기다리는 중…', kind: 'bad' };
+    if (status === 'passed') return { text: '패스했어요. 다른 사람을 기다리는 중…', kind: '' };
+    if (s.feedback === 'rate') return { text: '너무 빨라요. 1초 뒤에 다시 제출해 주세요.', kind: 'bad' };
+    if (s.feedback === 'wrong') return { text: `틀렸어요. 남은 기회 ${s.attemptsLeft}번`, kind: 'bad' };
+    return { text: '', kind: '' };
+  }
+
+  renderGame() {
+    const s = this.session;
+    if (!s?.room || !this.playback || this.app.screen !== 'online-game') return;
+    const room = s.room;
+    const round = s.round;
+    if (!round) {
+      // prepare를 받기 전(재접속 직후 등): 다음 라운드부터 합류한다
+      $('#on-overlay').classList.remove('hidden');
+      $('#on-overlay-text').textContent = '다음 라운드부터 함께해요';
+      this.renderBoard(false);
+      return;
+    }
+    if (this.renderedRoundId !== round.roundId) {
+      this.renderedRoundId = round.roundId;
+      $('#on-answer-input').value = '';
+      this.buildChoices();
+    }
+    const revealed = s.phase === 'revealed' && !!s.reveal;
+    const easy = !!round.choices;
+
+    $('#on-round-label').textContent = `${round.index + 1} / ${round.total}`;
+    $('#on-mode-label').textContent = [MODE_LABEL[round.mode], round.mode === MODE.RANDOM ? `${round.clipLength}초` : null, DIFFICULTY_LABEL[round.difficulty]]
+      .filter(Boolean)
+      .join(' · ');
+    $('#on-score-label').textContent = `${s.me?.score ?? 0}점`;
+
+    // 플레이어·오버레이(공개 전에는 영상을 가린다. iframe title 보호를 위해 inert)
+    for (let i = 0; i < 2; i++) {
+      const slot = $(`#on-slot-${i}`);
+      slot.classList.toggle('active', i === this.playback.active);
+      slot.inert = !this.playback.isPlayerVisible(i);
+    }
+    const showVideo = this.playback.isPlayerVisible(this.playback.active);
+    $('#on-overlay').classList.toggle('hidden', showVideo);
+    $('#on-eq').classList.toggle('on', this.playback.stage === PLAYBACK_STAGE.PLAYING);
+    $('#on-overlay-text').textContent = this.overlayText();
+
+    // 남은 시간
+    $('#on-progress-bar').style.width = `${Math.round(s.windowProgress() * 100)}%`;
+    const left = s.secondsLeft();
+    $('#on-progress-label').textContent = revealed || left == null ? '' : `남은 시간 ${Math.ceil(left)}초`;
+
+    this.renderBoard(revealed);
+
+    // 답 입력
+    const canAnswer = s.canAnswer;
+    $('#on-answer-area').hidden = revealed;
+    $('#on-choices').hidden = !easy;
+    $('#on-answer-form').hidden = easy;
+    const left3 = s.attemptsLeft;
+    $('#on-attempts').textContent = `남은 기회 ${'●'.repeat(left3)}${'○'.repeat(SCORING.maxWrongAttempts - left3)}`;
+    $('#on-answer-input').disabled = !canAnswer;
+    $('#on-answer-form button').disabled = !canAnswer;
+    $('#on-answer-input').placeholder = round.difficulty === DIFFICULTY.HARD ? '곡 제목' : '곡 제목 또는 작품명';
+    for (const [i, btn] of $$('#on-choices .btn').entries()) {
+      const wrong = s.wrongChoices.has(i);
+      btn.classList.toggle('wrong', wrong);
+      btn.disabled = wrong || !canAnswer;
+    }
+    $('#on-pass').disabled = !canAnswer;
+    const fb = this.feedbackText();
+    $('#on-feedback').textContent = fb.text;
+    $('#on-feedback').className = `feedback ${fb.kind}`;
+
+    // 정답 공개
+    $('#on-reveal').hidden = !revealed;
+    if (revealed) {
+      const r = s.reveal;
+      const result = $('#on-reveal-result');
+      if (r.winnerId) {
+        const mine = r.winnerId === s.you;
+        result.textContent = `${mine ? '내가 맞혔어요! ' : `${r.winnerNickname}님이 맞혔어요. `}+${r.points}점 · ${Number(r.elapsed).toFixed(1)}초`;
+        result.className = `reveal-result ${mine ? 'ok' : ''}`;
+      } else {
+        result.textContent = REASON_TEXT[r.reason] ?? '아무도 맞히지 못했어요';
+        result.className = 'reveal-result bad';
+      }
+      $('#on-reveal-title').textContent = r.song.title;
+      $('#on-reveal-anime').textContent = [r.song.anime, r.song.type].filter(Boolean).join(' · ');
+      const names = new Map(room.players.map((p) => [p.id, p.nickname]));
+      $('#on-reveal-excluded').textContent = r.excluded?.length
+        ? `제외된 사람: ${r.excluded.map((e) => `${names.get(e.playerId) ?? '?'}(${STATUS_CHIP[e.reason] ?? e.reason})`).join(', ')}`
+        : '';
+      $('#on-reveal-next').textContent = r.hasNext ? '잠시 뒤 다음 라운드가 시작돼요.' : '잠시 뒤 결과가 나와요.';
+    }
+  }
+
+  renderBoard(revealed) {
+    const s = this.session;
+    const room = s.room;
+    $('#on-board').replaceChildren(
+      ...room.players
+        .filter((p) => !p.left)
+        .map((p) => {
+          const chip = !p.connected ? '연결 끊김' : STATUS_CHIP[p.status] ?? '';
+          const winner = revealed && s.reveal.winnerId === p.id;
+          return el(
+            'li',
+            { class: `${p.id === s.you ? 'me' : ''} ${winner ? 'winner' : ''}`.trim() },
+            el('span', { class: 'name', text: p.nickname }),
+            chip ? el('span', { class: 'chip', text: chip }) : '',
+            el('span', { class: 'pts', text: `${p.score}점` }),
+          );
+        }),
+    );
+  }
+
+  // ---------- 결과 ----------
+  buildResult() {
+    return el(
+      'section',
+      { id: 'screen-online-result', class: 'screen', 'data-screen': 'online-result', hidden: true },
+      el('h1', { text: '최종 순위' }),
+      el('p', { class: 'status', id: 'on-result-note' }),
+      el('ol', { id: 'on-ranking', class: 'ranking' }),
+      el('h2', { text: '라운드별 기록' }),
+      el('ol', { id: 'on-history', class: 'result-list' }),
+      el(
+        'div',
+        { class: 'actions' },
+        el('button', { type: 'button', class: 'btn primary big', id: 'on-again', text: '같은 멤버로 한 판 더', onclick: () => this.session?.start() }),
+        el('button', { type: 'button', class: 'btn', id: 'on-leave-result', text: '방 나가기', onclick: () => this.leave() }),
+      ),
+      el('p', { class: 'status', id: 'on-result-hint' }),
+    );
+  }
+
+  renderResult() {
+    const s = this.session;
+    const over = s.gameOver;
+    $('#on-result-note').textContent = over ? GAME_OVER_NOTE[over.reason] ?? '' : '';
+    $('#on-ranking').replaceChildren(
+      ...(over?.ranking ?? []).map((r) =>
+        el(
+          'li',
+          { class: r.playerId === s.you ? 'me' : '' },
+          el('span', { class: 'rank', text: `${r.rank}위` }),
+          el('span', { class: 'name', text: r.nickname }),
+          r.left ? el('span', { class: 'chip', text: '나감' }) : '',
+          el('span', { class: 'pts', text: `${r.score}점 · 정답 ${r.correct}` }),
+        ),
+      ),
+    );
+    $('#on-history').replaceChildren(
+      ...(over?.history ?? []).map((h) =>
+        el(
+          'li',
+          {},
+          el('span', { class: 'pts', text: h.winnerId ? `+${h.points}점` : '' }),
+          el('span', { class: h.winnerId ? 'ok' : 'bad', text: h.winnerId ? '○ ' : '× ' }),
+          `${h.title} — ${h.winnerNickname ? `${h.winnerNickname} (${Number(h.elapsed).toFixed(1)}초)` : '정답자 없음'}`,
+        ),
+      ),
+    );
+    $('#on-again').hidden = !s.isHost;
+    $('#on-result-hint').textContent = s.isHost ? '' : '방장이 다시 시작하길 기다리는 중…';
+  }
+}
