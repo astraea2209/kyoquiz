@@ -614,7 +614,7 @@
     "titleAliases": ["Mephisto"],
     "anime": { "name": "최애의 아이", "aliases": ["오시노코", "최애"] },
     "artist": "Queen Bee",
-    "artistAliases": ["여왕봉", "퀸비"],
+    "artistAliases": ["여왕벌"],
     "type": "ED",
     "duration": 120,
     "enabled": true
@@ -650,7 +650,7 @@
     "titleAliases": ["테스트 미", "테스트미"],
     "anime": { "name": "최애의 아이", "aliases": ["오시노코", "최애"] },
     "artist": "CHANMINA",
-    "artistAliases": ["챠미나", "차미나"],
+    "artistAliases": ["챤미나"],
     "type": "OP",
     "duration": 90,
     "enabled": true
@@ -686,7 +686,7 @@
     "titleAliases": ["애니타임 애니웨어"],
     "anime": { "name": "장송의 프리렌", "aliases": ["프리렌", "Frieren: Beyond Journey's End"] },
     "artist": "milet",
-    "artistAliases": ["밀레"],
+    "artistAliases": ["미레이"],
     "type": "ED",
     "duration": 239,
     "enabled": true
@@ -698,7 +698,7 @@
     "titleAliases": ["룰루"],
     "anime": { "name": "장송의 프리렌", "aliases": ["프리렌", "Frieren: Beyond Journey's End"] },
     "artist": "Mrs. GREEN APPLE",
-    "artistAliases": ["미세스 그린 애플", "미세스", "미세스 그린애플"],
+    "artistAliases": ["미세스 그린 애플", "그린애플"],
     "type": "OP",
     "duration": 277,
     "enabled": true
@@ -710,7 +710,7 @@
     "titleAliases": ["더 스토리 오브 어스"],
     "anime": { "name": "장송의 프리렌", "aliases": ["프리렌", "Frieren: Beyond Journey's End"] },
     "artist": "milet",
-    "artistAliases": ["밀레"],
+    "artistAliases": ["미레이"],
     "type": "ED",
     "duration": 275,
     "enabled": true
@@ -722,7 +722,7 @@
     "titleAliases": ["트레이스"],
     "anime": { "name": "장송의 프리렌", "aliases": ["프리렌", "Frieren: Beyond Journey's End"] },
     "artist": "milet",
-    "artistAliases": ["밀레"],
+    "artistAliases": ["미레이"],
     "type": "삽입곡",
     "duration": 240,
     "enabled": true
