@@ -448,7 +448,8 @@
     "title": "인생은 짧으니, 맞서는 소녀여",
     "titleAliases": ["命短し対する乙女よ"],
     "anime": { "name": "대전 감사합니다 ~숙녀는 격투 게임을 안 해요~", "aliases": ["対ありでした。～お嬢さまは格闘ゲームなんてしない～", "対ありでした。"] },
-    "artist": "花冷え。",
+    "artist": "하나비에",
+    "artistAliases": ["花冷え。"],
     "type": "OP",
     "duration": 90,
     "enabled": true
@@ -460,6 +461,7 @@
     "titleAliases": ["뉴 게임"],
     "anime": { "name": "대전 감사합니다 ~숙녀는 격투 게임을 안 해요~", "aliases": ["対ありでした。～お嬢さまは格闘ゲームなんてしない～", "対ありでした。"] },
     "artist": "halca",
+    "artistAliases": ["할카"],
     "type": "ED",
     "duration": 90,
     "enabled": true
@@ -470,7 +472,8 @@
     "title": "아무것도 없어",
     "titleAliases": ["なんもねえ"],
     "anime": { "name": "담배 고양이", "aliases": ["ヤニねこ"] },
-    "artist": "忘れらんねえよ",
+    "artist": "와스레란네요",
+    "artistAliases": ["忘れらんねえよ"],
     "type": "OP",
     "duration": 90,
     "enabled": true
@@ -481,7 +484,8 @@
     "title": "연기와 블루",
     "titleAliases": ["煙とブルー"],
     "anime": { "name": "담배 고양이", "aliases": ["ヤニねこ"] },
-    "artist": "ネクライトーキー",
+    "artist": "네쿠라이토키",
+    "artistAliases": ["ネクライトーキー"],
     "type": "ED",
     "duration": 90,
     "enabled": true
@@ -492,7 +496,8 @@
     "title": "족제비 이념",
     "titleAliases": ["クズリ念"],
     "anime": { "name": "슈퍼 뒤에서 담배 피우는 두 사람", "aliases": ["スーパーの裏でヤニ吸うふたり"] },
-    "artist": "ずっと真夜中でいいのに。",
+    "artist": "즛토 마요나카데 이이노니",
+    "artistAliases": ["ずっと真夜中でいいのに。"],
     "type": "OP",
     "duration": 90,
     "enabled": true
@@ -503,7 +508,8 @@
     "title": "무화과 연기",
     "titleAliases": ["イチジク煙"],
     "anime": { "name": "슈퍼 뒤에서 담배 피우는 두 사람", "aliases": ["スーパーの裏でヤニ吸うふたり"] },
-    "artist": "ずっと真夜中でいいのに。",
+    "artist": "즛토 마요나카데 이이노니",
+    "artistAliases": ["ずっと真夜中でいいのに。"],
     "type": "OP",
     "duration": 90,
     "enabled": true
@@ -515,6 +521,7 @@
     "titleAliases": ["나이트 댄서"],
     "anime": { "name": "슈퍼 뒤에서 담배 피우는 두 사람", "aliases": ["スーパーの裏でヤニ吸うふたり"] },
     "artist": "imase",
+    "artistAliases": ["이마세"],
     "type": "ED",
     "duration": 92,
     "enabled": true
@@ -526,6 +533,7 @@
     "titleAliases": ["픽션"],
     "anime": { "name": "슈퍼 뒤에서 담배 피우는 두 사람", "aliases": ["スーパーの裏でヤニ吸うふたり"] },
     "artist": "imase",
+    "artistAliases": ["이마세"],
     "type": "ED",
     "duration": 90,
     "enabled": true
@@ -537,6 +545,7 @@
     "titleAliases": ["멜로딕 임팩트"],
     "anime": { "name": "야생의 라스트 보스가 나타났다!", "aliases": ["野生のラスボスが現れた！", "A Wild Last Boss Appeared!"] },
     "artist": "suspended4th",
+    "artistAliases": ["서스펜디드 4th"],
     "type": "OP",
     "duration": 96,
     "enabled": true
@@ -547,7 +556,8 @@
     "title": "레벨을 높여서 물리공격으로 때린다",
     "titleAliases": ["レベルを上げて物理で殴る"],
     "anime": { "name": "야생의 라스트 보스가 나타났다!", "aliases": ["野生のラスボスが現れた！", "A Wild Last Boss Appeared!"] },
-    "artist": "岸田教団&THE明星ロケッツ",
+    "artist": "키시다 교단&THE 묘조 로켓츠",
+    "artistAliases": ["岸田教団&THE明星ロケッツ"],
     "type": "OP",
     "duration": 90,
     "enabled": true
@@ -558,7 +568,8 @@
     "title": "나부껴 스커트",
     "titleAliases": ["揺れてスカート"],
     "anime": { "name": "야생의 라스트 보스가 나타났다!", "aliases": ["野生のラスボスが現れた！", "A Wild Last Boss Appeared!"] },
-    "artist": "ちゃくら",
+    "artist": "차쿠라",
+    "artistAliases": ["ちゃくら"],
     "type": "ED",
     "duration": 96,
     "enabled": true
@@ -569,7 +580,8 @@
     "title": "오른쪽 왼쪽",
     "titleAliases": ["ミギヒダリ"],
     "anime": { "name": "야생의 라스트 보스가 나타났다!", "aliases": ["野生のラスボスが現れた！", "A Wild Last Boss Appeared!"] },
-    "artist": "長瀬有花",
+    "artist": "나가세 유카",
+    "artistAliases": ["長瀬有花"],
     "type": "ED",
     "duration": 90,
     "enabled": true
