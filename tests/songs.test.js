@@ -6,11 +6,14 @@ import {
   HighScores,
   SongStore,
   createMemoryStorage,
+  formatDurationText,
   mergeSongs,
   normalizeSong,
   parseDurationText,
   parseSongList,
   searchSongs,
+  songFromForm,
+  songToFormValues,
   splitAliases,
 } from '../js/songs.js';
 import { makeSong } from './helpers.js';
@@ -134,6 +137,91 @@ test('parseDurationText: 초, 분:초, 시:분:초', () => {
   assert.equal(parseDurationText('1:60:00'), null);
   assert.equal(parseDurationText('3분'), null);
   assert.equal(parseDurationText('-5'), null);
+});
+
+test('formatDurationText: 초 → 분:초, parseDurationText와 왕복', () => {
+  assert.equal(formatDurationText(undefined), '');
+  assert.equal(formatDurationText(0), '');
+  assert.equal(formatDurationText(225), '3:45');
+  assert.equal(formatDurationText(65), '1:05');
+  assert.equal(formatDurationText(59), '0:59');
+  assert.equal(formatDurationText(3723), '1:02:03');
+  assert.equal(formatDurationText(212.5), '212.5');
+  for (const s of [59, 225, 3600, 3723, 212.5]) assert.equal(parseDurationText(formatDurationText(s)), s);
+});
+
+test('songToFormValues → songFromForm: 수정하지 않으면 같은 곡이 된다', () => {
+  const original = normalizeSong(
+    makeSong(1, {
+      id: 'bleach-op2',
+      artist: 'UVERworld',
+      artistAliases: ['우버월드', '우버'],
+      type: 'ED',
+      hookStart: 42,
+      skipStart: 5,
+      skipEnd: 10,
+      duration: 245,
+      enabled: false,
+    }),
+  );
+  const values = songToFormValues(original);
+  assert.deepEqual(values, {
+    link: original.videoId,
+    title: 'Song Title 1',
+    titleAliases: '별칭1',
+    artist: 'UVERworld',
+    artistAliases: '우버월드, 우버',
+    animeName: 'Anime Work 1',
+    animeAliases: '작품1',
+    type: 'ED',
+    duration: '4:05',
+    hookStart: '42',
+  });
+  const raw = songFromForm(values, { videoId: original.videoId, duration: parseDurationText(values.duration) }, original);
+  assert.deepEqual(normalizeSong(raw), original);
+});
+
+test('songFromForm: 수정은 id·skip·사용 여부를 유지하고 바꾼 값만 반영, 새 곡은 videoId가 id', () => {
+  const original = normalizeSong(makeSong(2, { id: 'keep-id', skipStart: 3, enabled: false, duration: 200 }));
+  const values = { ...songToFormValues(original), title: ' 새 제목 ', titleAliases: 'a, b', animeName: '', hookStart: '', duration: '' };
+  const edited = normalizeSong(songFromForm(values, { videoId: original.videoId, duration: undefined }, original));
+  assert.equal(edited.id, 'keep-id');
+  assert.equal(edited.title, '새 제목');
+  assert.deepEqual(edited.titleAliases, ['a', 'b']);
+  assert.equal(edited.anime, undefined);
+  assert.equal(edited.skipStart, 3);
+  assert.equal(edited.enabled, false);
+  assert.equal(edited.duration, undefined);
+  assert.equal(edited.hookStart, undefined);
+
+  const fresh = normalizeSong(songFromForm({ ...values, title: '새 곡' }, { videoId: 'abcdefghijk', duration: 100 }));
+  assert.equal(fresh.id, 'abcdefghijk');
+  assert.equal(fresh.enabled, true);
+  assert.equal(fresh.duration, 100);
+});
+
+test('SongStore: songs.json 곡 수정과 원래대로', () => {
+  const store = new SongStore(createMemoryStorage(), [makeSong(1), makeSong(2)]);
+  const vid = makeSong(1).videoId;
+  assert.ok(store.isBaseSong(vid));
+  assert.equal(store.isBaseSong('abcdefghijk'), false);
+  assert.equal(store.revert(vid), false); // 고친 적 없음
+
+  store.add({ ...makeSong(1), title: '고친 제목', enabled: false });
+  assert.equal(store.all().find((s) => s.videoId === vid).title, '고친 제목');
+  assert.equal(store.all().find((s) => s.videoId === vid).source, 'user');
+
+  assert.ok(store.revert(vid));
+  const back = store.all().find((s) => s.videoId === vid);
+  assert.equal(back.title, 'Song Title 1');
+  assert.equal(back.source, 'base');
+  assert.equal(back.enabled, false); // 꺼 둔 상태는 유지
+  assert.equal(store.all().length, 2);
+
+  // 직접 추가한 곡은 되돌릴 원본이 없다
+  store.add({ videoId: 'abcdefghijk', title: '내 곡' });
+  assert.equal(store.revert('abcdefghijk'), false);
+  assert.equal(store.all().length, 3);
 });
 
 test('exportJson({userOnly}): 직접 추가한 곡만 내보낸다', () => {

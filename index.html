@@ -167,6 +167,7 @@
       </div>
 
       <form id="song-form" class="song-form" autocomplete="off">
+        <p class="edit-note" id="edit-note" hidden></p>
         <label>YouTube 링크 또는 영상 ID
           <input name="link" id="link-input" required placeholder="https://youtu.be/..." />
         </label>
@@ -194,12 +195,15 @@
           <label>hookStart (초, 선택) <input name="hookStart" type="number" min="0" step="1" inputmode="numeric" /></label>
         </div>
         <p class="hint">곡 길이는 영상 전체 길이예요. 모르면 비워 두면 게임이 처음 재생할 때 재요.</p>
-        <button type="submit" class="btn primary">곡 추가</button>
+        <div class="form-actions">
+          <button type="submit" class="btn primary" id="song-submit">곡 추가</button>
+          <button type="button" class="btn" id="edit-cancel" hidden>수정 취소</button>
+        </div>
       </form>
 
       <h2>등록된 곡</h2>
       <p class="manage-count" id="manage-count"></p>
-      <label class="song-search">곡 찾기 (사용 끄기·삭제)
+      <label class="song-search">곡 찾기 (수정·사용 끄기·삭제)
         <input type="search" id="song-search" placeholder="제목, 작품명, 가수, 별칭, 영상 ID" autocomplete="off" />
       </label>
       <p class="hint" id="song-search-note"></p>

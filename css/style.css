@@ -269,13 +269,21 @@ textarea { min-height: 100px; margin: 8px 0; }
 .song-form { display: grid; gap: 10px; background: var(--panel); padding: 14px; border-radius: var(--radius); }
 .song-form label { display: grid; gap: 4px; font-size: 0.9rem; color: var(--muted); }
 .song-form .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.song-form .form-actions { display: flex; gap: 10px; }
+.song-form .form-actions .btn { flex: 1; }
+.song-form .form-actions .btn[hidden], .edit-note[hidden] { display: none; }
+.edit-note { margin: 0; padding: 10px 12px; border-radius: var(--radius); background: var(--bg); font-size: 0.9rem; line-height: 1.5; }
+.edit-note strong { color: var(--accent); }
+.song-form input[readonly] { opacity: 0.6; }
 .manage-count { margin: 0; padding: 12px 14px; background: var(--panel); border-radius: var(--radius); font-size: 1.05rem; }
 .manage-count strong { font-size: 1.4rem; }
 .song-search { display: grid; gap: 4px; margin-top: 12px; font-size: 0.9rem; color: var(--muted); }
-.song-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
-.song-list li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--panel); border-radius: var(--radius); }
+.song-list { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.song-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 12px; background: var(--panel); border-radius: var(--radius); }
 .song-list li.off { opacity: 0.5; }
-.song-list .info { flex: 1; min-width: 0; }
+.song-list li.editing { outline: 2px solid var(--accent); }
+.song-list .info { flex: 1 1 200px; min-width: 0; }
+.song-list .row-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .song-list .info strong, .song-list .info span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .song-list .info span { color: var(--muted); font-size: 0.85rem; }
 .switch { display: flex; align-items: center; gap: 6px; min-height: var(--tap); font-size: 0.85rem; }

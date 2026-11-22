@@ -5,7 +5,14 @@ import { handleGameKey } from './hotkeys.js';
 import { DIFFICULTY } from './judge.js';
 import { parseYouTubeLink, youtubeWatchUrl } from './linkParser.js';
 import { SCORING, parseRounds } from './scoring.js';
-import { loadSettings, parseDurationText, saveSettings, searchSongs, splitAliases } from './songs.js';
+import {
+  loadSettings,
+  parseDurationText,
+  saveSettings,
+  searchSongs,
+  songFromForm,
+  songToFormValues,
+} from './songs.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -75,6 +82,7 @@ export class App {
     this.resultShown = false;
     this.answerWasReady = false;
     this.revealWasShown = false;
+    this.editing = null; // 곡 관리 폼에서 수정 중인 곡
   }
 
   init() {
@@ -545,7 +553,8 @@ export class App {
     form.addEventListener('submit', (event) => {
       event.preventDefault();
       const f = form.elements;
-      const parsed = parseYouTubeLink(f.link.value);
+      const editing = this.editing;
+      const parsed = editing ? { videoId: editing.videoId } : parseYouTubeLink(f.link.value);
       if (!parsed) {
         this.toast('YouTube 링크 또는 11자리 영상 ID를 입력해 주세요.');
         return;
@@ -555,27 +564,23 @@ export class App {
         this.toast('곡 길이는 3:45 또는 225(초)처럼 입력해 주세요.');
         return;
       }
-      const exists = this.store.all().some((s) => s.videoId === parsed.videoId);
-      const song = this.store.add({
-        videoId: parsed.videoId,
-        title: f.title.value,
-        titleAliases: splitAliases(f.titleAliases.value),
-        artist: f.artist.value,
-        artistAliases: splitAliases(f.artistAliases.value),
-        anime: { name: f.animeName.value, aliases: splitAliases(f.animeAliases.value) },
-        type: f.type.value,
-        hookStart: f.hookStart.value === '' ? undefined : Number(f.hookStart.value),
-        duration,
-        enabled: true,
-      });
+      const values = Object.fromEntries(Object.keys(songToFormValues({})).map((key) => [key, f[key].value]));
+      // 수정 중에 사용 여부를 바꿨을 수 있으니 저장 직전의 곡을 원본으로 쓴다
+      const original = editing ? this.store.all().find((s) => s.videoId === editing.videoId) ?? editing : null;
+      const exists = !editing && this.store.all().some((s) => s.videoId === parsed.videoId);
+      const song = this.store.add(songFromForm(values, { videoId: parsed.videoId, duration }, original));
       if (!song) {
         this.toast('곡 제목을 입력해 주세요.');
         return;
       }
-      this.toast(exists ? `같은 영상이 있어 교체했습니다: ${song.title}` : `추가했습니다: ${song.title}`);
-      form.reset();
-      hookInput.dataset.auto = '0';
-      $('#link-result').textContent = '';
+      if (editing) this.toast(`수정했습니다: ${song.title}`);
+      else this.toast(exists ? `같은 영상이 있어 교체했습니다: ${song.title}` : `추가했습니다: ${song.title}`);
+      this.endEdit();
+      this.renderManage();
+    });
+
+    $('#edit-cancel').addEventListener('click', () => {
+      this.endEdit();
       this.renderManage();
     });
 
@@ -604,6 +609,44 @@ export class App {
       event.target.value = '';
     });
     $('#import-text-btn').addEventListener('click', () => this.importText($('#import-text').value));
+  }
+
+  /** 등록 폼을 수정 모드로: 곡 값을 채우고 링크(영상)는 잠근다 */
+  startEdit(song) {
+    const form = $('#song-form');
+    const f = form.elements;
+    form.reset();
+    this.editing = song;
+    for (const [key, value] of Object.entries(songToFormValues(song))) f[key].value = value;
+    f.hookStart.dataset.auto = '0';
+    f.link.readOnly = true;
+    $('#link-result').textContent = `영상 ID: ${song.videoId} (수정 중에는 영상을 바꿀 수 없어요)`;
+    const note = $('#edit-note');
+    note.replaceChildren(
+      el('strong', { text: `"${song.title}" 수정 중` }),
+      this.store.isBaseSong(song.videoId)
+        ? ' · songs.json 곡은 이 브라우저에서만 바뀌어요. 모두에게 반영하려면 "내 곡만 내보내기"로 운영자에게 보내 주세요.'
+        : '',
+    );
+    note.hidden = false;
+    $('#song-submit').textContent = '수정 저장';
+    $('#edit-cancel').hidden = false;
+    this.renderSearch();
+    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    f.title.focus({ preventScroll: true });
+  }
+
+  /** 수정 모드를 끝내고 빈 등록 폼으로 */
+  endEdit() {
+    const form = $('#song-form');
+    this.editing = null;
+    form.reset();
+    form.elements.link.readOnly = false;
+    form.elements.hookStart.dataset.auto = '0';
+    $('#link-result').textContent = '';
+    $('#edit-note').hidden = true;
+    $('#song-submit').textContent = '곡 추가';
+    $('#edit-cancel').hidden = true;
   }
 
   /** JSON 파일로 내려받고, 아래 입력란에도 복사해 둔다 */
@@ -664,28 +707,60 @@ export class App {
             this.renderManage();
           },
         });
-        const detail = [song.anime?.name, song.type, song.videoId, song.source === 'base' ? 'songs.json' : '직접 추가'];
+        // songs.json 곡을 이 브라우저에서 고쳤으면 source가 user로 바뀐다
+        const editedBase = song.source === 'user' && this.store.isBaseSong(song.videoId);
+        const origin = song.source === 'base' ? 'songs.json' : editedBase ? 'songs.json · 이 브라우저에서 수정함' : '직접 추가';
+        const detail = [song.anime?.name, song.type, song.videoId, origin];
+        const isEditing = this.editing?.videoId === song.videoId;
+        const classes = [song.enabled ? '' : 'off', isEditing ? 'editing' : ''].filter(Boolean).join(' ');
         return el(
           'li',
-          { class: song.enabled ? '' : 'off' },
+          { class: classes },
           el(
             'div',
             { class: 'info' },
             el('strong', { text: song.artist ? `${song.title} / ${song.artist}` : song.title }),
             el('span', { text: detail.filter(Boolean).join(' · ') }),
           ),
-          el('label', { class: 'switch' }, toggle, '사용'),
-          el('button', {
-            type: 'button',
-            class: 'btn small danger',
-            text: '삭제',
-            onclick: () => {
-              if (!confirm(`"${song.title}"을(를) 삭제할까요?`)) return;
-              this.store.remove(song.videoId);
-              this.toast(`삭제했습니다: ${song.title}`);
-              this.renderManage();
-            },
-          }),
+          el(
+            'div',
+            { class: 'row-actions' },
+            el('label', { class: 'switch' }, toggle, '사용'),
+            el('button', {
+              type: 'button',
+              class: 'btn small',
+              text: '수정',
+              'aria-label': `${song.title} 수정`,
+              onclick: () => this.startEdit(song),
+            }),
+            editedBase
+              ? el('button', {
+                  type: 'button',
+                  class: 'btn small',
+                  text: '원래대로',
+                  title: '이 브라우저에서 고친 내용을 지우고 songs.json 내용으로 되돌립니다',
+                  onclick: () => {
+                    if (!confirm(`"${song.title}"을(를) songs.json 내용으로 되돌릴까요? 이 브라우저에서 고친 내용은 지워져요.`)) return;
+                    this.store.revert(song.videoId);
+                    if (isEditing) this.endEdit();
+                    this.toast(`songs.json 내용으로 되돌렸습니다: ${song.title}`);
+                    this.renderManage();
+                  },
+                })
+              : '',
+            el('button', {
+              type: 'button',
+              class: 'btn small danger',
+              text: '삭제',
+              onclick: () => {
+                if (!confirm(`"${song.title}"을(를) 삭제할까요?`)) return;
+                this.store.remove(song.videoId);
+                if (this.editing?.videoId === song.videoId) this.endEdit();
+                this.toast(`삭제했습니다: ${song.title}`);
+                this.renderManage();
+              },
+            }),
+          ),
         );
       }),
     );
