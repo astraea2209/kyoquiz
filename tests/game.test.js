@@ -507,3 +507,20 @@ test('매우 어려움이 아닌 난이도는 오답 기회 3번 그대로', () 
   assert.equal(game.maxWrongAttempts, 3);
   assert.equal(game.round.items, null);
 });
+
+test('라운드 수 직접 지정(7)과 15초 구간', () => {
+  const { game, players } = setup({ songCount: 10, settings: { rounds: 7, clipLength: 15 } });
+  game.start();
+  assert.equal(game.totalRounds, 7);
+  const start = game.round.segmentStart;
+  assert.ok(start >= 20 && start + 15 <= 180);
+  beginAudio(game);
+  players[0].time = start + 14.5;
+  game.tick();
+  assert.equal(game.phase, PHASE.PLAYING);
+  players[0].time = start + 15;
+  game.tick();
+  assert.equal(game.phase, PHASE.STOPPED);
+  game.submitAnswer(game.round.song.title);
+  assert.equal(game.round.result.points, 50);
+});

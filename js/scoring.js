@@ -3,7 +3,7 @@
 export const SCORING = Object.freeze({
   random: {
     base: 100,
-    clipFactors: Object.freeze({ 3: 1.5, 5: 1.0, 10: 0.7 }),
+    clipFactors: Object.freeze({ 3: 1.5, 5: 1.0, 10: 0.7, 15: 0.5 }),
     replayPenalty: 20,
     minCorrect: 10,
   },
@@ -29,10 +29,29 @@ export const SCORING = Object.freeze({
   }),
   maxWrongAttempts: 3,
   replaysPerRound: 1,
-  clipLengths: Object.freeze([3, 5, 10]),
+  clipLengths: Object.freeze([3, 5, 10, 15]),
   defaultClipLength: 5,
-  roundOptions: Object.freeze([5, 10, 20]),
+  roundOptions: Object.freeze([5, 10, 20]), // 빠른 선택 버튼. 이 밖의 수는 직접 입력(roundLimits 범위)
+  roundLimits: Object.freeze({ min: 1, max: 100 }),
+  defaultRounds: 10,
 });
+
+/** 라운드 수로 쓸 수 있는 값인지(정수, roundLimits 범위) */
+export function isValidRounds(value) {
+  const { min, max } = SCORING.roundLimits;
+  return Number.isInteger(value) && value >= min && value <= max;
+}
+
+/**
+ * 사용자가 입력한 라운드 수를 정리한다. 숫자가 아니면 null, 범위를 벗어나면 가까운 끝값.
+ * @param {string|number} input
+ */
+export function parseRounds(input) {
+  const text = String(input ?? '').trim();
+  if (!/^\d+$/.test(text)) return null;
+  const { min, max } = SCORING.roundLimits;
+  return Math.min(max, Math.max(min, Number(text)));
+}
 
 /** 랜덤듣기 정답 점수 */
 export function scoreRandom({ clipLength, replayUsed }, cfg = SCORING.random) {

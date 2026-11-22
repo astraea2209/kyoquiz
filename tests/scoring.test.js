@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { SCORING, answerWindow, scoreExtremeBonus, scoreExtremeItem, scoreFull, scoreMulti, scoreMultiFull, scoreMultiRandom, scoreRandom } from '../js/scoring.js';
+import { SCORING, answerWindow, isValidRounds, parseRounds, scoreExtremeBonus, scoreExtremeItem, scoreFull, scoreMulti, scoreMultiFull, scoreMultiRandom, scoreRandom } from '../js/scoring.js';
 
 test('랜덤듣기 점수: 구간 계수', () => {
   assert.equal(scoreRandom({ clipLength: 3, replayUsed: false }), 150);
@@ -83,4 +83,25 @@ test('매우 어려움 보너스와 상수', () => {
   assert.equal(scoreExtremeBonus(70), 35);
   assert.equal(SCORING.extreme.maxWrongAttempts, 5);
   assert.ok(Object.isFrozen(SCORING.extreme.itemWeights));
+});
+
+test('랜덤듣기 15초 구간: 계수 0.5', () => {
+  assert.ok(SCORING.clipLengths.includes(15));
+  assert.equal(scoreRandom({ clipLength: 15, replayUsed: false }), 50);
+  assert.equal(scoreRandom({ clipLength: 15, replayUsed: true }), 30);
+  assert.equal(answerWindow({ mode: 'random', clipLength: 15, answerTime: 15 }), 30);
+  assert.equal(scoreMultiRandom({ clipLength: 15, elapsed: 0, answerTime: 15 }), 75);
+});
+
+test('라운드 수 직접 입력: 1~100 정수', () => {
+  assert.equal(isValidRounds(1), true);
+  assert.equal(isValidRounds(100), true);
+  assert.equal(isValidRounds(37), true);
+  for (const bad of [0, 101, 7.5, '10', null, NaN]) assert.equal(isValidRounds(bad), false);
+  assert.equal(parseRounds('37'), 37);
+  assert.equal(parseRounds(' 8 '), 8);
+  assert.equal(parseRounds(15), 15);
+  assert.equal(parseRounds('0'), 1, '범위 밖은 끝값으로');
+  assert.equal(parseRounds('500'), 100);
+  for (const bad of ['', '  ', 'abc', '3.5', '-2', null, undefined]) assert.equal(parseRounds(bad), null);
 });

@@ -16,7 +16,7 @@
 
 import { DIFFICULTY, buildChoices, canUseMultipleChoice, itemCandidates, judgeAnswer, judgeItems, shuffle } from '../js/judge.js';
 import { MODE } from '../js/game.js';
-import { SCORING, answerWindow, scoreExtremeBonus, scoreExtremeItem, scoreMulti } from '../js/scoring.js';
+import { SCORING, answerWindow, isValidRounds, scoreExtremeBonus, scoreExtremeItem, scoreMulti } from '../js/scoring.js';
 import { pickSegmentStart } from '../js/segment.js';
 
 export const ROOM_PHASE = Object.freeze({
@@ -439,7 +439,7 @@ export class Room {
     const next = { ...this.settings };
     const rules = {
       mode: (v) => Object.values(MODE).includes(v),
-      rounds: (v) => SCORING.roundOptions.includes(v),
+      rounds: isValidRounds,
       clipLength: (v) => SCORING.clipLengths.includes(v),
       difficulty: (v) => Object.values(DIFFICULTY).includes(v),
       answerTime: (v) => SCORING.multi.answerTimes.includes(v),

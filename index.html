@@ -44,12 +44,16 @@
           <label><input type="radio" name="clipLength" value="3" /><span>3초</span></label>
           <label><input type="radio" name="clipLength" value="5" checked /><span>5초</span></label>
           <label><input type="radio" name="clipLength" value="10" /><span>10초</span></label>
+          <label><input type="radio" name="clipLength" value="15" /><span>15초</span></label>
         </fieldset>
         <fieldset class="segmented">
           <legend>라운드</legend>
           <label><input type="radio" name="rounds" value="5" /><span>5</span></label>
           <label><input type="radio" name="rounds" value="10" checked /><span>10</span></label>
           <label><input type="radio" name="rounds" value="20" /><span>20</span></label>
+          <label class="segmented-number">
+            <input type="number" id="rounds-custom" min="1" max="100" step="1" inputmode="numeric" placeholder="직접" aria-label="라운드 수 직접 입력(1~100)" />
+          </label>
         </fieldset>
         <fieldset class="segmented">
           <legend>난이도</legend>

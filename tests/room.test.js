@@ -78,11 +78,14 @@ test('설정: 방장만, 값 검증, 부분 변경', () => {
   assert.equal(env.state().settings.mode, 'full');
   assert.equal(env.state().settings.rounds, 5);
 
-  for (const bad of [{ rounds: 7 }, { clipLength: 4 }, { answerTime: 12 }, { mode: 'x' }, { difficulty: 'insane' }]) {
+  for (const bad of [{ rounds: 0 }, { rounds: 101 }, { rounds: 7.5 }, { rounds: '10' }, { clipLength: 4 }, { answerTime: 12 }, { mode: 'x' }, { difficulty: 'insane' }]) {
     env.send('a', { type: 'settings', settings: bad });
     assert.equal(env.last('a', 'error').code, 'bad-settings');
   }
   assert.equal(env.state().settings.rounds, 5); // 잘못된 요청은 아무것도 바꾸지 않는다
+  // 라운드 수는 1~100 정수면 직접 정할 수 있고, 구간 15초도 된다
+  env.send('a', { type: 'settings', settings: { rounds: 37, clipLength: 15 } });
+  assert.deepEqual([env.state().settings.rounds, env.state().settings.clipLength], [37, 15]);
 });
 
 test('시작: 방장만, 2명 이상', () => {

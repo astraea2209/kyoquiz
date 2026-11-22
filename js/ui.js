@@ -3,7 +3,7 @@
 import { GameSession, MODE, PHASE } from './game.js';
 import { DIFFICULTY } from './judge.js';
 import { parseYouTubeLink } from './linkParser.js';
-import { SCORING } from './scoring.js';
+import { SCORING, parseRounds } from './scoring.js';
 import { loadSettings, parseDurationText, saveSettings, searchSongs, splitAliases } from './songs.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -114,6 +114,30 @@ export class App {
       const input = $(`input[name="${name}"][value="${saved[name]}"]`);
       if (input) input.checked = true;
     }
+    // 빠른 선택에 없는 라운드 수는 직접 입력칸에 채운다
+    const rounds = parseRounds(saved.rounds);
+    if (rounds != null && !SCORING.roundOptions.includes(rounds)) this.setCustomRounds(rounds);
+  }
+
+  /** 라운드 직접 입력: 값을 넣으면 빠른 선택 버튼은 해제한다 */
+  setCustomRounds(value) {
+    $('#rounds-custom').value = value;
+    for (const radio of $$('input[name="rounds"]')) radio.checked = false;
+  }
+
+  bindRoundsInput() {
+    const custom = $('#rounds-custom');
+    custom.addEventListener('input', () => {
+      if (custom.value !== '') for (const radio of $$('input[name="rounds"]')) radio.checked = false;
+    });
+    // 범위를 벗어난 값은 입력을 마칠 때 끝값으로 고친다
+    custom.addEventListener('change', () => {
+      const rounds = parseRounds(custom.value);
+      custom.value = rounds ?? '';
+      if (rounds == null && !$('input[name="rounds"]:checked')) $(`input[name="rounds"][value="${SCORING.defaultRounds}"]`).checked = true;
+      this.renderStart();
+    });
+    for (const radio of $$('input[name="rounds"]')) radio.addEventListener('change', () => (custom.value = ''));
   }
 
   readSettings() {
@@ -121,7 +145,7 @@ export class App {
     return {
       mode: value('mode') === MODE.FULL ? MODE.FULL : MODE.RANDOM,
       clipLength: Number(value('clipLength')) || SCORING.defaultClipLength,
-      rounds: Number(value('rounds')) || 10,
+      rounds: Number(value('rounds')) || parseRounds($('#rounds-custom').value) || SCORING.defaultRounds,
       difficulty: value('difficulty') || DIFFICULTY.NORMAL,
       timeLimit: SCORING.full.timeLimit,
     };
@@ -129,6 +153,7 @@ export class App {
 
   bindStart() {
     $('#screen-start').addEventListener('change', () => this.renderStart());
+    this.bindRoundsInput();
     $('#start-btn').addEventListener('click', () => {
       const settings = this.readSettings();
       saveSettings(this.storage, settings);

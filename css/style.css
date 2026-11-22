@@ -103,7 +103,8 @@ legend { color: var(--muted); font-size: 0.9rem; margin-bottom: 6px; }
 
 .segmented { display: flex; flex-wrap: wrap; gap: 6px; }
 .segmented legend { width: 100%; }
-.segmented label { flex: 1; }
+/* position: relative — 숨긴 라디오(position: absolute, width 100%)가 화면 폭 기준으로 늘어나 가로 스크롤이 생기지 않게 */
+.segmented label { flex: 1; position: relative; }
 .segmented input { position: absolute; opacity: 0; pointer-events: none; }
 .segmented span {
   display: flex;
@@ -117,6 +118,20 @@ legend { color: var(--muted); font-size: 0.9rem; margin-bottom: 6px; }
   border: 1px solid #2f3445;
   cursor: pointer;
 }
+/* 라운드 직접 입력: 버튼과 같은 크기의 숫자 칸 */
+.segmented .segmented-number input {
+  position: static;
+  opacity: 1;
+  pointer-events: auto;
+  min-height: 44px;
+  height: 100%;
+  padding: 0 6px;
+  text-align: center;
+  border-radius: 10px;
+  border: 1px solid #2f3445;
+}
+.segmented .segmented-number input:not(:placeholder-shown) { border-color: var(--accent); background: var(--accent); color: #fff; }
+.segmented .segmented-number input::placeholder { color: var(--text); opacity: 1; }
 .segmented input:checked + span { background: var(--accent); border-color: var(--accent); color: #fff; }
 .segmented input:focus-visible + span { outline: 2px solid var(--accent); }
 .segmented[disabled] { opacity: 0.4; }

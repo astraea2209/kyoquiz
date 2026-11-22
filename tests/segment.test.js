@@ -74,3 +74,12 @@ test('duration이 없으면 오류', () => {
   assert.throws(() => pickSegmentStart({ duration: 0, clipLength: 5 }));
   assert.throws(() => pickSegmentStart({ clipLength: 5 }));
 });
+
+test('15초 구간: 구간이 곡 안에 들어가고, 짧은 곡은 가운데', () => {
+  for (let i = 0; i < 50; i++) {
+    const start = pickSegmentStart({ duration: 90, clipLength: 15 }, () => i / 50);
+    assert.ok(start >= 9 && start + 15 <= 81, `start ${start}`);
+  }
+  assert.deepEqual(segmentRange({ duration: 16, clipLength: 15 }), { min: 0.5, max: 0.5, reason: 'short' });
+  assert.equal(pickSegmentStart({ duration: 10, clipLength: 15 }), 0);
+});

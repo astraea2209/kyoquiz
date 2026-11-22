@@ -3,7 +3,7 @@
 
 import { MODE } from '../game.js';
 import { DIFFICULTY } from '../judge.js';
-import { SCORING } from '../scoring.js';
+import { SCORING, parseRounds } from '../scoring.js';
 import { RoomConnection } from './connection.js';
 import { buildInviteLink, resolveServerUrl, roomsUrl, webSocketUrl } from './config.js';
 import { ClockSync } from './net.js';
@@ -356,6 +356,7 @@ export class OnlineApp {
             el('span', { text }),
           ),
         ),
+        ...(key === 'rounds' ? [this.customRoundsInput()] : []),
       ),
     );
     return el(
@@ -378,6 +379,30 @@ export class OnlineApp {
       el('p', { class: 'status', id: 'on-lobby-hint' }),
       el('div', { class: 'actions' }, el('button', { type: 'button', class: 'btn ghost', id: 'on-leave-lobby', text: '방 나가기', onclick: () => this.leave() })),
     );
+  }
+
+  /** 라운드 수 직접 입력(1~100). 입력을 마치면 방장 설정으로 보낸다 */
+  customRoundsInput() {
+    const input = el('input', {
+      type: 'number',
+      id: 'on-rounds-custom',
+      min: String(SCORING.roundLimits.min),
+      max: String(SCORING.roundLimits.max),
+      step: '1',
+      inputmode: 'numeric',
+      placeholder: '직접',
+      'aria-label': `라운드 수 직접 입력(${SCORING.roundLimits.min}~${SCORING.roundLimits.max})`,
+      onchange: () => {
+        const rounds = parseRounds(input.value);
+        if (rounds == null) {
+          this.renderLobby(); // 지우거나 숫자가 아니면 현재 방 설정으로 되돌린다
+          return;
+        }
+        input.value = rounds;
+        this.session?.setSettings({ rounds });
+      },
+    });
+    return el('label', { class: 'segmented-number' }, input);
   }
 
   copyInvite() {
@@ -411,7 +436,12 @@ export class OnlineApp {
       const fieldset = $(`#on-set-${key}`);
       const full = room.settings.mode === MODE.FULL;
       fieldset.disabled = !isHost || ((key === 'clipLength' || key === 'answerTime') && full);
-      for (const input of $$('input', fieldset)) input.checked = input.value === String(room.settings[key]);
+      for (const input of $$('input[type="radio"]', fieldset)) input.checked = input.value === String(room.settings[key]);
+    }
+    // 빠른 선택에 없는 라운드 수는 직접 입력칸에 보인다(입력 중이면 건드리지 않는다)
+    const custom = $('#on-rounds-custom');
+    if (document.activeElement !== custom) {
+      custom.value = SCORING.roundOptions.includes(room.settings.rounds) ? '' : room.settings.rounds;
     }
     const connected = room.players.filter((p) => p.connected && !p.left).length;
     const enough = connected >= SCORING.multi.minPlayers;
