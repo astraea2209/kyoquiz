@@ -1,6 +1,7 @@
 // 화면 렌더링과 DOM 이벤트 처리. 게임 규칙은 game.js에 있다.
 
 import { GameSession, MODE, PHASE } from './game.js';
+import { handleGameKey } from './hotkeys.js';
 import { DIFFICULTY } from './judge.js';
 import { parseYouTubeLink } from './linkParser.js';
 import { SCORING, parseRounds } from './scoring.js';
@@ -216,6 +217,18 @@ export class App {
       if (this.game?.replay()) this.focusAnswer();
     });
     $('#pass-btn').addEventListener('click', () => this.game?.pass());
+    // 패스 단축키 K(입력칸 밖에서), Esc로 입력칸 빠져나오기
+    document.addEventListener('keydown', (event) => {
+      if (this.screen !== 'game' || !this.game) return;
+      handleGameKey(event, {
+        pass: () => {
+          const btn = $('#pass-btn');
+          if (btn.hidden || btn.disabled) return false;
+          btn.click();
+          return true;
+        },
+      });
+    });
     $('#next-btn').addEventListener('click', () => this.game?.next());
     $('#quit-btn').addEventListener('click', () => {
       if (!this.game) return;

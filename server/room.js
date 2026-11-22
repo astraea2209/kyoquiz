@@ -9,12 +9,14 @@
 // 매우 어려움: 제목·가수·작품명(곡에 있는 항목)을 각자 맞힌 시점의 속도 점수로 나눠 받고, 전부 맞혀야 '정답'으로 잠긴다.
 // 일부만 맞힌 사람도 공개 때 그 점수를 받는다. 다른 사람에게는 맞힌 항목 개수(solved)만 보인다.
 //
-// 클라이언트 → 서버: join, settings, start, ready, answer, pass, playerError, ping, leave
-// 서버 → 클라이언트: joined, state, prepare, go, locked, answerResult, rateLimited, reveal, gameOver, notice, error, pong, kicked
+// 클라이언트 → 서버: join, settings, start, ready, answer, pass, playerError, chat, ping, leave
+// 서버 → 클라이언트: joined, state, prepare, go, locked, answerResult, rateLimited, reveal, gameOver, notice, error, pong, kicked,
+//                   chat, chatLog, chatBlocked
+// 채팅: 대기실·게임·결과 어디서나. 라운드 중(공개 전)에는 정답이 들어간 채팅을 막는다(chatBlocked {reason: 'answer'}).
 // 라운드 메시지(ready, answer, pass, playerError)는 roundId가 현재 라운드와 다르면 조용히 무시한다.
 // 공개(reveal) 전에는 곡 제목·별칭·정답 위치를 어떤 메시지에도 싣지 않는다.
 
-import { DIFFICULTY, buildChoices, canUseMultipleChoice, itemCandidates, judgeAnswer, judgeItems, shuffle } from '../js/judge.js';
+import { DIFFICULTY, buildChoices, canUseMultipleChoice, itemCandidates, judgeAnswer, judgeItems, revealsAnswer, shuffle } from '../js/judge.js';
 import { MODE } from '../js/game.js';
 import { SCORING, answerWindow, isValidRounds, scoreExtremeBonus, scoreExtremeItem, scoreMulti } from '../js/scoring.js';
 import { pickSegmentStart } from '../js/segment.js';
@@ -51,6 +53,9 @@ export const ROOM_CONFIG = Object.freeze({
   answerCooldownMs: 1000,
   maxNicknameLength: 12,
   maxAnswerLength: 100,
+  maxChatLength: 100,
+  chatCooldownMs: 500, // 한 사람이 채팅을 보내는 최소 간격
+  chatLogSize: 50, // 새로 들어오거나 재접속한 사람에게 보내 주는 최근 채팅 수
 });
 
 export const DEFAULT_SETTINGS = Object.freeze({
@@ -139,6 +144,8 @@ export class Room {
 
     this.timerIds = {};
     this.graceTimers = new Map(); // playerId → timer id
+    this.chatLog = []; // 최근 채팅(방이 살아 있는 동안 유지)
+    this.chatSeq = 0;
     this.closed = false;
     this.resetGame();
   }
@@ -180,6 +187,8 @@ export class Room {
         return this.onPass(player, message);
       case 'playerError':
         return this.onPlayerError(player, message);
+      case 'chat':
+        return this.onChat(player, message);
       case 'leave':
         return this.removePlayer(player);
       default:
@@ -346,11 +355,13 @@ export class Room {
       left: false,
       score: 0,
       correct: 0,
+      lastChatAt: null,
     };
     this.players.set(player.id, player);
     this.connToPlayer.set(connId, player.id);
     if (!this.hostId) this.hostId = player.id;
     this.sendTo(connId, { type: 'joined', code: this.code, playerId: player.id, token: player.token, reconnected: false });
+    this.sendChatLog(connId);
     this.broadcastState();
   }
 
@@ -365,6 +376,7 @@ export class Room {
     player.connected = true;
     this.connToPlayer.set(connId, player.id);
     this.sendTo(connId, { type: 'joined', code: this.code, playerId: player.id, token: player.token, reconnected: true });
+    this.sendChatLog(connId);
 
     if (this.stalled) {
       // 모두 끊겨 멈춰 있던 게임: 혼자 돌아왔으니 결과 화면으로
@@ -378,11 +390,7 @@ export class Room {
   }
 
   cleanNickname(raw) {
-    const text = String(raw ?? '')
-      .replace(/[\p{Cc}\p{Cf}]/gu, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-    return Array.from(text).slice(0, this.config.maxNicknameLength).join('').trim();
+    return this.cleanText(raw, this.config.maxNicknameLength);
   }
 
   uniqueNickname(base) {
@@ -427,6 +435,43 @@ export class Room {
     if (this.closed) return;
     this.dispose();
     this.onClose?.(this);
+  }
+
+  // ---------- 채팅 ----------
+  onChat(player, message) {
+    // 줄바꿈·탭은 지우지 않고 띄어쓰기로 바꾼다(닉네임은 제어 문자로 보고 지운다)
+    const text = this.cleanText(String(message.text ?? '').replace(/\s+/g, ' '), this.config.maxChatLength);
+    if (!text) return;
+    const now = this.now();
+    if (player.lastChatAt != null && now - player.lastChatAt < this.config.chatCooldownMs) {
+      this.sendToPlayer(player, { type: 'chatBlocked', reason: 'rate' });
+      return;
+    }
+    // 공개 전에는 정답(제목·가수·작품명과 별칭)이 들어간 채팅을 막는다. 보낸 사람에게만 알린다
+    const hidden = [ROOM_PHASE.PREPARING, ROOM_PHASE.STARTING, ROOM_PHASE.ANSWERING].includes(this.phase);
+    if (hidden && this.round && revealsAnswer(text, this.round.song)) {
+      this.sendToPlayer(player, { type: 'chatBlocked', reason: 'answer' });
+      return;
+    }
+    player.lastChatAt = now;
+    const entry = { id: ++this.chatSeq, playerId: player.id, nickname: player.nickname, text, at: now };
+    this.chatLog.push(entry);
+    if (this.chatLog.length > this.config.chatLogSize) this.chatLog.shift();
+    this.broadcast({ type: 'chat', ...entry });
+  }
+
+  /** 입장·재접속한 연결에 최근 채팅을 보낸다 */
+  sendChatLog(connId) {
+    if (this.chatLog.length) this.sendTo(connId, { type: 'chatLog', messages: this.chatLog });
+  }
+
+  /** 제어 문자를 빼고 공백을 하나로 줄여 최대 길이(글자 수)로 자른다 */
+  cleanText(raw, maxLength) {
+    const text = String(raw ?? '')
+      .replace(/[\p{Cc}\p{Cf}]/gu, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return Array.from(text).slice(0, maxLength).join('').trim();
   }
 
   // ---------- 설정·시작 ----------

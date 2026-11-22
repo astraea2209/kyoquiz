@@ -302,3 +302,22 @@ textarea { min-height: 100px; margin: 8px 0; }
 .overlay-text { font-size: 1.15rem; font-weight: 600; }
 .settings fieldset:disabled { opacity: 0.55; }
 .settings fieldset:disabled span { cursor: default; }
+
+/* 친구와 대결 채팅(대기실·게임·결과 화면을 옮겨 다닌다) */
+.chat { margin: 16px 0; }
+.chat-log {
+  list-style: none;
+  margin: 0;
+  padding: 8px 12px;
+  height: 150px;
+  overflow-y: auto;
+  background: var(--panel);
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+}
+.chat-log:empty::before { content: attr(data-empty); color: var(--muted); }
+.chat-log li { overflow-wrap: anywhere; padding: 1px 0; }
+.chat-name { color: var(--accent); font-weight: 600; margin-right: 6px; }
+.chat-log li.me .chat-name { color: var(--ok); }
+.chat-status { min-height: 1.2em; margin: 4px 0; font-size: 0.85rem; color: var(--warn); }
+.chat-form input { min-width: 0; }

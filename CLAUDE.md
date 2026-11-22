@@ -56,25 +56,26 @@
 - `js/ui.js`: App 클래스. 화면 전환과 DOM 처리
 - `js/game.js`: GameSession 상태 머신(라운드 진행, 재생 오류 시 곡 교체, 곡 부족 시 라운드 축소)
 - `js/player.js`: YouTube IFrame API 로드와 플레이어 래퍼
-- `js/judge.js`: 정답 정규화, 오타 허용, 난이도별 인정 범위, 객관식 보기 생성. 매우 어려움용 `itemCandidates`(곡에 있는 항목만: title·artist·anime)와 `judgeItems`(입력 하나를 남은 항목 전부와 비교), `splitArtistNames`(여러 명이 부른 곡의 가수 표기를 ×·&·쉼표·、·/·` x `·feat.·ft.·featuring·with로 나누고 앞의 THE를 뺀 이름도 추가. and와 +는 이름의 일부라 나누지 않음)
+- `js/judge.js`: 정답 정규화, 오타 허용, 난이도별 인정 범위, 객관식 보기 생성. `revealsAnswer`(채팅 글에 정답이 들어 있는지: 제목·가수·작품명과 별칭 전부와 오타 허용 비교, 또는 2글자 이상 후보가 글 안에 그대로 들어 있음). 매우 어려움용 `itemCandidates`(곡에 있는 항목만: title·artist·anime)와 `judgeItems`(입력 하나를 남은 항목 전부와 비교), `splitArtistNames`(여러 명이 부른 곡의 가수 표기를 ×·&·쉼표·、·/·` x `·feat.·ft.·featuring·with로 나누고 앞의 THE를 뺀 이름도 추가. and와 +는 이름의 일부라 나누지 않음)
 - `js/scoring.js`: 점수 상수와 계산. 밸런스 조정은 이 파일의 `SCORING`만 바꾼다. 매우 어려움은 `SCORING.extreme`(항목 가중치 제목 2·가수 1·작품명 1, 완주 보너스 0.5, 오답 기회 5)과 `scoreExtremeItem`, `scoreExtremeBonus`. 멀티용은 `SCORING.multi`(속도 보너스 +50%, 답변 시간 10/15/20초, 인원 2~8)와 `scoreMulti`, `answerWindow`
 - `js/segment.js`: 랜덤듣기 구간 선택(앞뒤 10% 제외, hookStart ±5초 우선)
 - `js/linkParser.js`: YouTube 링크에서 videoId와 `t=` 시작 시간 추출
+- `js/hotkeys.js`: 게임 화면 단축키(개인전·친구와 대결 공용, 순수 함수). K = 패스(`event.code === 'KeyK'`라 한글 자판 ㅏ도 됨, 글자 입력칸에 포커스가 있으면 동작 안 함), Esc = 입력칸 빠져나오기. 소리가 나면 답 입력칸에 자동 포커스되므로 입력 중에는 Esc → K(사용자 결정, 2026-11-22). 패스 버튼 문구 `패스 (K)`
 - `js/volume.js`: 노래 볼륨(0~100, 기본 80, localStorage `asq.volume`). `VolumeControl`이 개인전·친구와 대결 플레이어 모두에 `setVolume`을 적용하고, 슬라이더(시작 화면, 개인전 게임, 대기실, 대결 게임)는 `bindVolumeInput`으로 같은 값을 공유한다. `js/player.js`는 `unMute` 때 볼륨을 다시 적용한다
 - `js/songs.js`: 곡 스키마(애니송과 일반 노래 공용), songs.json과 localStorage 병합, 영상 길이 캐시, 최고 점수, 설정 저장. 곡 필드: id, videoId, title(유일한 필수값), titleAliases, anime{name, aliases}(선택, 일반 노래는 필드 자체가 없음), artist·artistAliases(선택, 매우 어려움에서만 정답 항목, 다른 난이도는 표시·저장만), type(`SONG_TYPES`: OP, ED, 삽입곡, OST, 캐릭터송, 일반곡, 기타. 비우면 작품이 있으면 OP, 없으면 일반곡), hookStart·skipStart·skipEnd·duration(선택, 초), enabled. 화면에서 `song.anime`은 없을 수 있으니 `?.`로 읽는다
 - `songs.json`: 기본 곡 목록(156곡: 친구 곡 57곡(my_song2.json·my-songs_1.json 정리, 애니 OP·ED 위주, 일반곡 5, 어실주·깨끗하게 해주시겠어요?·악역 영애 등 사용자가 붙여 준 9곡 포함, 2026-11-22 추가) + 유명 애니 OP 12곡 + 블리치 OP·ED 15곡 + 9Lana(쿠라나) 13곡 + 2026년 애니 OP·ED 12곡(대전 감사합니다 2, 담배 고양이 2, 슈퍼 뒤에서 담배 피우는 두 사람 4, 야생의 라스트 보스가 나타났다! 4. 야생은 1기 2곡과 2기 2곡이 같은 `anime`를 쓴다) + 최애의 아이 5곡 + 장송의 프리렌 5곡 + 식령제로 2곡(2026-11-22 추가) + 친구 곡 모음 24곡 + 11곡(애니송 위주, 2026-11-22 추가. 앞 24곡은 my-songs.json에서 정리해 추가: 게임·영화 OST, 보컬로이드·일반곡, 애니 OP·ED 등. 가수 없는 곡 3개(Big Sleep, To the Infinity Castle, 실 부 프레지던트), 한글자막 팬 업로드 영상 다수라 삭제될 수 있음. 최애의 아이·프리렌·식령제로 곡의 작품명·곡명은 사용자 표기, 가수 한국어 이름·별칭은 Claude가 정함이라 확인 필요), 공식 채널 영상 위주. 9Lana 곡은 오리지널 10곡(`일반곡`, `anime` 없음), 애니 ED 2곡, 게임 주제가 1곡. 블리치 ほうき星 영상은 14분짜리라 `enabled:false`). 2026 곡의 작품명은 사용자가 준 한국어 제목을 그대로 썼다. 모든 곡의 제목·작품명·가수·별칭에서 일본어 글자와 로마자 별칭을 뺐다(2026-11-22, 한국어 발음 별칭으로 대신함). 표기·필드 규칙은 위 "곡 추가 절차". `duration`은 점검 스크립트 `--write`로 채움(있으면 게임이 길이 측정용 음소거 로드를 건너뜀). `hookStart`는 아직 없음. `songs.sample.json`: 형식 예시(자리표시자 값)
 - `tools/check-songs.mjs`: songs.json 점검(oEmbed로 존재·임베드 가능 여부와 채널명, watch 페이지 `lengthSeconds`로 길이, duration 차이, id·videoId 중복). 순수 함수는 export해 `tests/checkSongs.test.js`에서 네트워크 없이 테스트. `formatSongsJson`은 `tools/merge-songs.mjs`도 쓴다
 - `tools/merge-songs.mjs`: 곡 JSON 합치기(`mergeSongLists`, `orderSongFields`, `diffFields`). 테스트는 `tests/mergeSongs.test.js`
-- `tests/`: 단위 테스트 파일 17개(가짜 플레이어·시계·타이머·소켓 포함)
+- `tests/`: 단위 테스트 파일 19개(가짜 플레이어·시계·타이머·소켓 포함)
 - 멀티플레이(친구와 대결, 속도 점수) 핵심부. 설계는 Claude Docs 문서 "애니송 맞추기 멀티플레이 기획서"(https://claude.ai/artifact/3BLyVFbGYGhL7hk2pjG7SM). 서버 런타임과 멀티 화면에 의존하지 않는 부분만 구현됨:
   - `server/room.js`: `Room` 방 상태 머신(대기실→준비→시작 대기→답변→공개→결과). 매우 어려움은 `answerExtreme`(플레이어별 `solved` 항목, 오답 기회 `maxWrongAttempts` 5). 라운드는 첫 정답에 끝나지 않고, 전원이 정답·포기·오답 소진(또는 제외)되거나 답변 시간이 끝날 때 중 먼저 오는 쪽에서 공개한다. 정답자는 모두 각자 도착 시간에 따른 점수(`scoreMulti`)를 받고, 점수는 공개 때 반영한다. 시계(`now`), 난수(`rng`), 타이머(`timers`), 전송(`send(connId, msg)`), 토큰 생성(`genToken`)을 주입받는다. 어댑터는 `handleMessage(connId, msg)`와 `handleDisconnect(connId)`만 부르면 된다. 판정·구간 선택·점수는 `js/judge.js`, `js/segment.js`, `js/scoring.js`를 그대로 import. 시간·한도 상수는 `ROOM_CONFIG`(생성 때 `config`로 덮어쓰기)
   - `server/roomHost.js`: `RoomHost`. Room을 소켓({send, close})에 연결하는 런타임 무관 계층(JSON 파싱, 메시지 크기 2KB·빈도 40개/5초 제한, join 10초 제한, 빈 방 60초 뒤 닫기, 방이 닫히면 소켓 정리)
   - `server/index.js`: Cloudflare Workers + Durable Objects 진입점. `POST /api/rooms`(방 생성), `GET /ws?code=`(WebSocket), `GET /api/health`. 방 하나 = `RoomDO` 하나, 상태는 메모리에만 있다(재배포·재시작하면 진행 중인 방이 사라짐). `songs.json`을 번들로 가져다 쓴다. `wrangler.toml`: Durable Object 바인딩(`ROOMS`)과 `ALLOWED_ORIGINS`(허용 사이트)
   - `js/online/net.js`: 시계 차이 계산(순수 함수와 `ClockSync`)
   - `js/online/connection.js`: `RoomConnection` WebSocket 연결·토큰 재접속(0.5→4초 간격, 60초 안에 못 돌아오면 포기)·ping 시계 보정. 서버가 일부러 끊은 경우(1000/1008/1009)와 치명적 오류(방 가득 참, 이미 시작함, 닉네임)는 재접속하지 않는다
-  - `js/online/session.js`: `OnlineSession` 서버 메시지 → 화면용 상태(내 정보, 라운드, 남은 시간, 기회, 잠금), 사용자 동작 → 메시지(roundId 포함). 재생 제어는 주입
+  - `js/online/session.js`: `OnlineSession` 서버 메시지 → 화면용 상태(내 정보, 라운드, 남은 시간, 기회, 잠금, 채팅 `chat`·`chatVersion`·`chatBlocked`), 사용자 동작 → 메시지(roundId 포함, `sendChat`). 재생 제어는 주입
   - `js/online/config.js`: 서버 주소 결정(`?server=` → 저장값 → localhost면 로컬 서버 → `DEFAULT_SERVER_URL`), 초대 링크·WebSocket URL 만들기
-  - `js/online/ui.js`: `OnlineApp` 화면 4개(입장, 대기실, 게임, 순위). 기존 `App.showScreen`을 그대로 쓰고 `js/ui.js`·`js/game.js`는 건드리지 않았다. 개인전 플레이어와 별개로 iframe 2개(`online-player-0/1`)를 처음 입장할 때 만든다. 시작 화면의 "친구와 대결" 버튼은 `js/main.js`가 연결한다
+  - `js/online/ui.js`: `OnlineApp` 화면 4개(입장, 대기실, 게임, 순위). 채팅 패널(`#on-chat`) 하나를 대기실·게임·순위 화면의 `.chat-slot`으로 옮겨 쓴다(화면이 바뀌어도 쓰던 글과 목록 유지). 채팅 입력칸에 글이 있으면 답 입력칸 자동 포커스가 뺏지 않는다. 기존 `App.showScreen`을 그대로 쓰고 `js/ui.js`·`js/game.js`는 건드리지 않았다. 개인전 플레이어와 별개로 iframe 2개(`online-player-0/1`)를 처음 입장할 때 만든다. 시작 화면의 "친구와 대결" 버튼은 `js/main.js`가 연결한다
   - `js/online/playback.js`: `OnlinePlayback` 재생 제어(prepare→ready→go→reveal). 플레이어 2개 교대, 플레이어·시계·타이머·전송 주입
   - `tests/fakeTimers.js`, `tests/roomHelpers.js`: 시계와 연동된 가짜 타이머, 가짜 소켓 환경
 
@@ -104,7 +105,7 @@
 
 ## 검증 현황
 
-- 확인함: 단위 테스트 228개 통과(개인전·곡 점검·볼륨·곡 합치기·매우 어려움·15초·라운드 입력·가수 나누기 98개 + 멀티 130개), 모든 JS 파일 `node --check` 통과, 가짜 YT 객체를 넣은 헤드리스 Chrome에서 곡 추가부터 결과 화면까지의 흐름, 실제 브라우저에서 YouTube 재생과 소리·영상(사용자 확인), songs.json 12곡 모두 localhost에서 임베드 재생 오류 없음(2026-11-15), `tools/check-songs.mjs`로 12곡 모두 정상(oEmbed 200, duration 채움, 2026-11-15), 9Lana 13곡 추가 후 40곡 모두 정상(2026-11-16), 2026 애니 12곡 추가 후 52곡, 최애의 아이·프리렌·식령제로 12곡 추가 후 64곡, 친구 곡 24곡 추가 후 88곡, 11곡 추가 후 99곡, 57곡 추가 후 156곡 모두 정상·duration 채움(2026-11-22, oEmbed·점검 스크립트만. 실제 임베드 재생은 확인 안 함)
+- 확인함: 단위 테스트 247개 통과(개인전·곡 점검·볼륨·곡 합치기·매우 어려움·15초·라운드 입력·가수 나누기·단축키 104개 + 멀티(채팅 포함) 143개), 모든 JS 파일 `node --check` 통과, 가짜 YT 객체를 넣은 헤드리스 Chrome에서 곡 추가부터 결과 화면까지의 흐름, 실제 브라우저에서 YouTube 재생과 소리·영상(사용자 확인), songs.json 12곡 모두 localhost에서 임베드 재생 오류 없음(2026-11-15), `tools/check-songs.mjs`로 12곡 모두 정상(oEmbed 200, duration 채움, 2026-11-15), 9Lana 13곡 추가 후 40곡 모두 정상(2026-11-16), 2026 애니 12곡 추가 후 52곡, 최애의 아이·프리렌·식령제로 12곡 추가 후 64곡, 친구 곡 24곡 추가 후 88곡, 11곡 추가 후 99곡, 57곡 추가 후 156곡 모두 정상·duration 채움(2026-11-22, oEmbed·점검 스크립트만. 실제 임베드 재생은 확인 안 함)
 - 실제 YouTube로 확인함(데스크톱 Chromium, 2026-11-15):
   - 0초 소리 누출 없음. iframe의 infoDelivery 메시지로 기록해 보니, 길이를 모르는 5곡 모두 0초 부근에서는 음소거였고 unMute는 구간 시작 위치에서만 일어났다. 3초 구간은 약 3.1초 재생
   - 오버레이는 공개 전까지 무대 전체를 가리고, 공개 때만 현재 플레이어가 보인다. controls=0이라 공개 중에도 제목 표시줄은 안 보임
@@ -128,8 +129,10 @@
 - 미구현·미확인: 랜덤듣기·쉬움(객관식) 화면의 실제 브라우저 확인, 모바일 실기기·카카오톡 인앱 브라우저, 시작 신호 소리 시각 오차 측정, 백그라운드 탭 동작, 재접속 배너(`연결이 끊겼어요`) 실제 확인
 - 실제 브라우저·기기로 확인하지 못함: 시작 신호 소리 시각 오차(브라우저 2개 이상에서 infoDelivery로 측정 필요), 모바일 자동 진행
 - 서버 규칙 중 코드에서 정한 것(문서에 없던 세부): 오류 과반(절반 초과) 판정은 준비 단계에서만 곡 교체, 시작 신호 뒤 오류는 그 사람만 제외. ready 시간 초과로 아무도 준비하지 못해도 곡 교체. 대기실에서도 끊기면 60초 유예 뒤 퇴장(새로고침 대비). 결과 화면에서 새 입장 허용. 랜덤듣기는 `duration`이 없는 곡을 제외(songs.json 12곡은 `duration`이 채워져 있음). 시작 신호는 `go` 전송 3초 뒤. 전원 이탈 시 방은 유예(60초)가 끝나면 닫힘(`onClose`)
+- 채팅·패스 단축키 K(2026-11-22, 브랜치 claude/ingame-chat-pass-hotkey-5f1bde, 로컬 `wrangler dev` + `python -m http.server 8000`, 브라우저 탭 2개): 대기실 채팅이 두 탭에 전달, 게임 시작하면 채팅 패널이 게임 화면 아래로 옮겨지고 목록 유지, 라운드 중 `이거 서머 포켓츠 노래 같은데`(작품명 포함)는 막혀 본인에게 안내·입력칸에 글 복원·상대에게 안 감, 정답 없는 채팅은 라운드 중에도 전달, 정답 공개 중에는 곡 제목이 든 채팅 전달. 답 입력칸에서 K는 글자 입력, Esc → K로 패스(대결·개인전 모두, 실제 키 입력). 375px 폭 게임 화면 가로 스크롤 없음. 재접속 때 최근 채팅(`chatLog`) 받기는 단위 테스트로만 확인. 서버 배포 전이라 공개 페이지에서는 채팅이 서버에 무시된다(배포 필요)
+- 채팅 프로토콜: 클라이언트 `chat {text}`(100자, 공백 정리), 서버 → 모두 `chat {id, playerId, nickname, text, at}`, 입장·재접속한 연결에 `chatLog {messages}`(최근 50개, `ROOM_CONFIG.chatLogSize`), 보낸 사람에게만 `chatBlocked {reason: 'answer'|'rate'}`(준비·시작 대기·답변 단계에서 `revealsAnswer`면 answer, 0.5초 안에 다시 보내면 rate). 막힌 채팅은 쿨다운에 넣지 않는다
 - 매우 어려움 프로토콜(2026-11-22, 기존 메시지에 필드만 추가. 다른 난이도는 그대로): `prepare.items`(항목 키 배열, 아니면 null)·`prepare.attempts`(기회 수), 상태 스냅샷 플레이어 `solved`(맞힌 항목 개수, 매우 어려움 아니면 null), 항목을 맞히면 본인에게 `answerResult {correct: true, items, itemPoints, points(이번 획득, 보너스 포함), total, bonus, complete, elapsed, order}`(complete일 때만 `locked`), 이미 맞힌 항목만 내면 `answerResult {correct: false, already, attemptsLeft}`(기회 유지), `reveal`·`history`에 `items`와 `partialPlayers [{playerId, nickname, points, solved}]`, `correctPlayers` 항목에 `solved`, `reveal.song.artist`. 서버 배포함(2026-11-22, 버전 ea7a2a13). 배포 서버에 Node WebSocket으로 방 생성·입장 후 `extreme` 설정이 받아들여지고 state에 `solved`가 오는 것, 공개 페이지에 매우 어려움 선택지가 반영된 것 확인(공개 페이지에서 실제 대결은 안 해 봄)
-- 프로토콜: 클라이언트 `join/settings/start/ready/answer/pass/playerError/ping/leave`, 서버 `joined/state/prepare/go/locked/answerResult/rateLimited/reveal/gameOver/notice/error/pong/kicked`. 주의: 문서의 메시지 표에 없던 `joined`(토큰 전달), `answerResult`(본인에게만 오답 결과), `rateLimited`, `notice`, `pong`, `kicked`, `leave`를 추가했다. `reveal`에 `nextVideoId`가 있어 다음 곡을 cue한다. 정답 처리: 맞힌 사람에게만 `answerResult {correct: true, points, elapsed, order}`, 모두에게 `locked {reason: 'correct'}`, 상태 `correct`. `reveal`·`gameOver.history`는 `correctPlayers [{playerId, nickname, elapsed, points}]`(처리 순서)와 `reason: 'done'|'timeout'`을 싣는다(예전 `winnerId`·`winnerNickname`·`points`·`elapsed`와 `reason: 'correct'|'exhausted'`는 없어짐)
+- 프로토콜: 클라이언트 `join/settings/start/ready/answer/pass/playerError/chat/ping/leave`, 서버 `joined/state/prepare/go/locked/answerResult/rateLimited/reveal/gameOver/notice/error/pong/kicked/chat/chatLog/chatBlocked`. 주의: 문서의 메시지 표에 없던 `joined`(토큰 전달), `answerResult`(본인에게만 오답 결과), `rateLimited`, `notice`, `pong`, `kicked`, `leave`를 추가했다. `reveal`에 `nextVideoId`가 있어 다음 곡을 cue한다. 정답 처리: 맞힌 사람에게만 `answerResult {correct: true, points, elapsed, order}`, 모두에게 `locked {reason: 'correct'}`, 상태 `correct`. `reveal`·`gameOver.history`는 `correctPlayers [{playerId, nickname, elapsed, points}]`(처리 순서)와 `reason: 'done'|'timeout'`을 싣는다(예전 `winnerId`·`winnerNickname`·`points`·`elapsed`와 `reason: 'correct'|'exhausted'`는 없어짐)
 
 ## 다음 작업 후보 (기획서 개발 단계)
 
@@ -137,7 +140,7 @@
 2. 난이도, 구간 길이, 별칭 매칭 다듬기. 매우 어려움: 최고 점수를 난이도별로 나눌지, 가중치·보너스·오답 기회 수 플레이 테스트
 3. 곡 등록 도구 보강: 점검 스크립트, 가수·가수 별칭, 작품명 선택화, 종류 확장 완료. 곡 찾기로 사용 끄기·삭제, 곡 길이 입력, 내 곡만 내보내기와 합치기 스크립트 완료. 남은 것: 등록한 곡 수정(지금은 같은 링크로 다시 추가해 교체), 점검 결과로 삭제·차단된 영상 정리(자동 비활성화 등), 정기 점검 방식
 4. 확장 모드(작품명 맞추기, 서바이벌, 타임어택)
-5. 친구와 대결 이어서(위 멀티 구현 현황 참고): 랜덤듣기·쉬움 확인 → 실기기 동기화 측정 → 배포는 main을 push하면 Pages가 자동 갱신, 서버는 `npm run server:deploy`
+5. 친구와 대결 이어서(위 멀티 구현 현황 참고): 채팅 서버 배포(`npm run server:deploy`)와 공개 페이지 확인, 랜덤듣기·쉬움 확인 → 실기기 동기화 측정 → 배포는 main을 push하면 Pages가 자동 갱신, 서버는 `npm run server:deploy`
 
 ## 미결정 사항
 
@@ -146,4 +149,5 @@
 - 첫 버전에 등록할 곡 수와 등록 담당
 - 영상 가리기가 YouTube API 서비스 약관에 맞는지(공개나 수익화 전에 약관 직접 확인)
 - 모바일을 1차 범위에 포함할지, 멀티플레이 도입 시점
+- 채팅 정답 차단이 2글자 이상 후보를 부분 포함으로 보므로 짧은 제목·가수명(예: 2글자)이 들어간 평범한 채팅도 라운드 중 막힐 수 있음. 플레이해 보고 기준(글자 수) 조정할지. 욕설 필터·채팅 끄기 옵션은 없음
 - 멀티플레이 관련(문서 "리스크와 열린 질문"): `server/`에 npm 패키지 원칙 적용 여부(지금은 wrangler를 npx로만 사용), 멀티용 곡 목록(정적 songs.json 공유 vs 서버 전용)과 `duration` 채우기, 모바일 자동 진행, 시작 신호 오차 허용 범위(실측 후), 다시듣기 없음 확인, 운영 한도(최대 인원, 동시 방 수), 모두 풀기 모드, YouTube 약관 확인

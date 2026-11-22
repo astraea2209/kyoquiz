@@ -4,6 +4,9 @@
 
 import { SCORING } from '../scoring.js';
 
+/** 채팅 한도(서버 ROOM_CONFIG와 같은 값. 서버가 최종 판단한다) */
+export const CHAT_LIMITS = Object.freeze({ maxLength: 100, cooldownMs: 500, keep: 100 });
+
 export class OnlineSession {
   /**
    * @param {object} opts
@@ -34,6 +37,10 @@ export class OnlineSession {
     this.lastChoice = null;
     this.feedbackAt = 0;
     this.kicked = false;
+    this.chat = []; // 받은 채팅 {id, playerId, nickname, text, at} (최근 CHAT_LIMITS.keep개)
+    this.chatVersion = 0; // 채팅 목록이 바뀔 때마다 1씩 늘어난다(화면이 다시 그릴지 판단)
+    this.chatBlocked = null; // 방금 막힌 내 채팅 {reason: 'answer'|'rate', at}
+    this.lastChatSentAt = null;
     this.listeners = { change: new Set(), notice: new Set(), error: new Set() };
 
     this.offMessage = connection.on('message', (m) => this.handle(m));
@@ -115,6 +122,17 @@ export class OnlineSession {
       case 'error':
         this.emit('error', message);
         break;
+      case 'chat':
+        this.addChat([message]);
+        break;
+      case 'chatLog':
+        // 입장·재접속 때 받는 최근 채팅. 이미 받은 것(id)은 건너뛴다
+        this.addChat(Array.isArray(message.messages) ? message.messages : []);
+        break;
+      case 'chatBlocked':
+        this.chatBlocked = { reason: message.reason, at: this.clock.serverNow() };
+        this.chatVersion++;
+        break;
       case 'kicked':
         this.kicked = true;
         this.playback.stop();
@@ -137,6 +155,21 @@ export class OnlineSession {
     this.feedback = null;
     this.wrongChoices = new Set();
     this.lastChoice = null;
+  }
+
+  addChat(list) {
+    const seen = new Set(this.chat.map((m) => m.id));
+    let added = false;
+    for (const m of list) {
+      if (!m || typeof m.text !== 'string' || seen.has(m.id)) continue;
+      seen.add(m.id);
+      this.chat.push({ id: m.id, playerId: m.playerId, nickname: m.nickname, text: m.text, at: m.at });
+      added = true;
+    }
+    if (!added) return;
+    this.chat.sort((a, b) => a.id - b.id);
+    if (this.chat.length > CHAT_LIMITS.keep) this.chat.splice(0, this.chat.length - CHAT_LIMITS.keep);
+    this.chatVersion++;
   }
 
   setFeedback(kind) {
@@ -224,6 +257,21 @@ export class OnlineSession {
   pass() {
     if (!this.canAnswer) return false;
     return this.send({ type: 'pass', roundId: this.round.roundId });
+  }
+
+  /**
+   * 채팅 보내기. 빈 글이거나 너무 빨리 보내면 보내지 않는다(서버도 같은 한도로 검사).
+   * @returns {'sent'|'empty'|'rate'|false}  false: 연결이 없어 못 보냄
+   */
+  sendChat(text) {
+    const value = Array.from(String(text ?? '').replace(/\s+/g, ' ').trim()).slice(0, CHAT_LIMITS.maxLength).join('');
+    if (!value) return 'empty';
+    const now = this.clock.serverNow();
+    if (this.lastChatSentAt != null && now - this.lastChatSentAt < CHAT_LIMITS.cooldownMs) return 'rate';
+    if (!this.send({ type: 'chat', text: value })) return false;
+    this.lastChatSentAt = now;
+    this.chatBlocked = null;
+    return 'sent';
   }
 
   leave() {

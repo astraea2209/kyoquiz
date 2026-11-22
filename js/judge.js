@@ -115,6 +115,23 @@ export function judgeItems(input, song, solved = []) {
   return { matched, already };
 }
 
+/**
+ * 채팅 글에 이 곡의 정답(제목·가수·작품명과 별칭)이 들어 있는지. 공개 전 채팅으로 정답이 새지 않게 막을 때 쓴다.
+ * 글 전체가 정답 후보와 (오타 허용 범위 안에서) 같거나, 정규화한 글 안에 2글자 이상인 후보가 그대로 들어 있으면 true.
+ */
+export function revealsAnswer(text, song) {
+  const normalized = normalizeAnswer(text);
+  if (!normalized) return false;
+  for (const candidates of Object.values(itemCandidates(song))) {
+    for (const candidate of candidates) {
+      if (matchesCandidate(text, candidate)) return true;
+      const key = normalizeAnswer(candidate);
+      if (Array.from(key).length >= 2 && normalized.includes(key)) return true;
+    }
+  }
+  return false;
+}
+
 /** 주관식 판정 */
 export function judgeAnswer(input, song, difficulty) {
   for (const candidate of answerCandidates(song, difficulty)) {

@@ -8,7 +8,8 @@ import { RoomConnection } from './connection.js';
 import { buildInviteLink, resolveServerUrl, roomsUrl, webSocketUrl } from './config.js';
 import { ClockSync } from './net.js';
 import { OnlinePlayback, PLAYBACK_STAGE } from './playback.js';
-import { OnlineSession } from './session.js';
+import { CHAT_LIMITS, OnlineSession } from './session.js';
+import { handleGameKey } from '../hotkeys.js';
 import { bindVolumeInput } from '../volume.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -46,6 +47,11 @@ const CLOSE_TEXT = {
   'gave-up': '서버와 연결이 오래 끊겨 방에서 나갔습니다.',
   'room-closed': '방이 닫혔습니다.',
   'rate-limit': '메시지를 너무 빨리 보내 연결이 끊겼습니다.',
+};
+
+const CHAT_BLOCKED_TEXT = {
+  answer: '정답이 들어간 채팅은 정답 공개 뒤에 보낼 수 있어요.',
+  rate: '채팅을 너무 빨리 보내고 있어요. 잠시 뒤에 보내 주세요.',
 };
 
 const NICKNAME_KEY = 'asq.nickname';
@@ -106,6 +112,10 @@ export class OnlineApp {
     this.joined = false;
     this.renderedRoundId = null;
     this.ticker = null;
+    this.chat = null; // 채팅 패널(대기실·게임·결과 화면을 옮겨 다닌다)
+    this.renderedChatVersion = -1;
+    this.pendingChat = null; // 방금 보낸 채팅(정답이 들어가 막히면 입력칸에 되돌린다)
+    this.handledChatBlock = null;
   }
 
   init() {
@@ -119,6 +129,12 @@ export class OnlineApp {
       $('#screen-start'),
     );
     this.bindEntry();
+    this.chat = this.buildChat();
+    // 패스 단축키 K(입력칸 밖에서), Esc로 입력칸 빠져나오기
+    document.addEventListener('keydown', (event) => {
+      if (this.app.screen !== 'online-game' || !this.session) return;
+      handleGameKey(event, { pass: () => !$('#on-pass').disabled && !!this.session?.pass() });
+    });
   }
 
   /** 볼륨 슬라이더. 개인전 화면과 같은 VolumeControl을 공유한다 */
@@ -253,6 +269,9 @@ export class OnlineApp {
     this.clock.reset();
     this.joined = false;
     this.renderedRoundId = null;
+    this.renderedChatVersion = -1;
+    this.pendingChat = null;
+    this.handledChatBlock = null;
     const connection = new RoomConnection({ url: webSocketUrl(this.serverUrl, code), clock: this.clock });
     const session = new OnlineSession({ connection, playback: this.playback, clock: this.clock });
     this.connection = connection;
@@ -320,6 +339,7 @@ export class OnlineApp {
     if (this.app.screen !== target) this.app.showScreen(target);
     if (target === 'online-game') this.startTicker();
     else this.stopTicker();
+    this.renderChat(target);
     if (target === 'online-lobby') this.renderLobby();
     else if (target === 'online-result') this.renderResult();
     else this.renderGame();
@@ -334,6 +354,79 @@ export class OnlineApp {
     if (this.ticker == null) return;
     clearInterval(this.ticker);
     this.ticker = null;
+  }
+
+  // ---------- 채팅 ----------
+  buildChat() {
+    const input = el('input', {
+      id: 'on-chat-input',
+      type: 'text',
+      maxlength: String(CHAT_LIMITS.maxLength),
+      enterkeyhint: 'send',
+      placeholder: '채팅 (정답은 공개 뒤에)',
+      'aria-label': '채팅 입력',
+      oninput: () => {
+        $('#on-chat-status').textContent = '';
+      },
+    });
+    return el(
+      'div',
+      { class: 'chat', id: 'on-chat' },
+      el('ul', { id: 'on-chat-log', class: 'chat-log', 'aria-label': '채팅', 'aria-live': 'polite', 'data-empty': '아직 채팅이 없어요' }),
+      el('p', { id: 'on-chat-status', class: 'chat-status', role: 'status' }),
+      el(
+        'form',
+        { id: 'on-chat-form', class: 'answer-form chat-form', autocomplete: 'off', onsubmit: (event) => this.submitChat(event) },
+        input,
+        el('button', { type: 'submit', class: 'btn', text: '보내기' }),
+      ),
+    );
+  }
+
+  submitChat(event) {
+    event.preventDefault();
+    const input = $('#on-chat-input');
+    const result = this.session?.sendChat(input.value);
+    if (result === 'sent') {
+      this.pendingChat = input.value;
+      input.value = '';
+      $('#on-chat-status').textContent = '';
+    } else if (result === 'rate') {
+      $('#on-chat-status').textContent = CHAT_BLOCKED_TEXT.rate;
+    }
+  }
+
+  /** 채팅 패널을 지금 화면으로 옮기고, 새 채팅이 있으면 목록을 다시 그린다 */
+  renderChat(screen) {
+    const s = this.session;
+    const slot = $(`#screen-${screen} .chat-slot`);
+    if (slot && this.chat.parentNode !== slot) slot.append(this.chat);
+    const log = $('#on-chat-log');
+    if (this.renderedChatVersion !== s.chatVersion) {
+      this.renderedChatVersion = s.chatVersion;
+      // 위로 올려 예전 채팅을 읽는 중이 아니면 맨 아래(새 채팅)로 내린다
+      const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+      const lastMine = s.chat.at(-1)?.playerId === s.you;
+      log.replaceChildren(
+        ...s.chat.map((m) =>
+          el(
+            'li',
+            { class: m.playerId === s.you ? 'me' : '' },
+            el('span', { class: 'chat-name', text: m.nickname }),
+            el('span', { class: 'chat-text', text: m.text }),
+          ),
+        ),
+      );
+      if (atBottom || lastMine) log.scrollTop = log.scrollHeight;
+    }
+    const blocked = s.chatBlocked;
+    if (blocked && blocked !== this.handledChatBlock) {
+      this.handledChatBlock = blocked;
+      $('#on-chat-status').textContent = CHAT_BLOCKED_TEXT[blocked.reason] ?? '채팅을 보내지 못했어요.';
+      // 정답이 들어가 막힌 글은 지우지 않고 입력칸에 돌려준다(공개 뒤에 그대로 보낼 수 있게)
+      const input = $('#on-chat-input');
+      if (blocked.reason === 'answer' && this.pendingChat && !input.value) input.value = this.pendingChat;
+    }
   }
 
   // ---------- 대기실 ----------
@@ -372,6 +465,7 @@ export class OnlineApp {
       ),
       el('h2', { text: '참가자' }),
       el('ul', { id: 'on-members', class: 'member-list' }),
+      el('div', { class: 'chat-slot' }),
       el('h2', {}, '설정 ', el('span', { id: 'on-settings-note', class: 'sub' })),
       el('div', { class: 'settings', id: 'on-settings' }, ...groups),
       this.volumeRow(),
@@ -498,7 +592,7 @@ export class OnlineApp {
           el('button', { type: 'submit', class: 'btn primary', text: '제출' }),
         ),
         el('p', { class: 'feedback', id: 'on-feedback', role: 'status' }),
-        el('div', { class: 'controls' }, el('button', { type: 'button', class: 'btn ghost', id: 'on-pass', text: '패스', onclick: () => this.session?.pass() })),
+        el('div', { class: 'controls' }, el('button', { type: 'button', class: 'btn ghost', id: 'on-pass', text: '패스 (K)', title: '단축키 K. 입력칸에 있을 때는 Esc를 누른 뒤 K', 'aria-keyshortcuts': 'K', onclick: () => this.session?.pass() })),
       ),
       el(
         'div',
@@ -509,6 +603,7 @@ export class OnlineApp {
         el('p', { class: 'sub', id: 'on-reveal-excluded' }),
         el('p', { class: 'sub', id: 'on-reveal-next' }),
       ),
+      el('div', { class: 'chat-slot' }),
     );
   }
 
@@ -639,7 +734,9 @@ export class OnlineApp {
     if (canAnswer && !this.answerWasReady && !easy) {
       const input = $('#on-answer-input');
       const active = document.activeElement;
-      if (active !== input && !active?.matches?.('[data-volume]')) input.focus();
+      // 볼륨 조절 중이거나 채팅을 쓰는 중이면 뺏지 않는다
+      const chatting = active?.id === 'on-chat-input' && active.value.trim();
+      if (active !== input && !active?.matches?.('[data-volume]') && !chatting) input.focus();
     }
     this.answerWasReady = canAnswer;
     const fb = this.feedbackText();
@@ -741,6 +838,7 @@ export class OnlineApp {
       el('h1', { text: '최종 순위' }),
       el('p', { class: 'status', id: 'on-result-note' }),
       el('ol', { id: 'on-ranking', class: 'ranking' }),
+      el('div', { class: 'chat-slot' }),
       el('h2', { text: '라운드별 기록' }),
       el('ol', { id: 'on-history', class: 'result-list' }),
       el(
