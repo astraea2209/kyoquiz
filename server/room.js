@@ -6,15 +6,17 @@
 // 단계: 대기실(lobby) → 준비(preparing) → 시작 대기(starting) → 답변(answering) → 공개(revealed) → … → 결과(results)
 // 라운드 종료: 참가자 전원이 정답을 맞혔거나 포기·오답 소진·제외됐을 때, 또는 답변 시간이 끝났을 때 중 먼저 오는 것.
 // 정답자는 각자 도착 시간에 따른 점수를 받는다(첫 정답자가 나와도 라운드는 계속된다).
+// 매우 어려움: 제목·가수·작품명(곡에 있는 항목)을 각자 맞힌 시점의 속도 점수로 나눠 받고, 전부 맞혀야 '정답'으로 잠긴다.
+// 일부만 맞힌 사람도 공개 때 그 점수를 받는다. 다른 사람에게는 맞힌 항목 개수(solved)만 보인다.
 //
 // 클라이언트 → 서버: join, settings, start, ready, answer, pass, playerError, ping, leave
 // 서버 → 클라이언트: joined, state, prepare, go, locked, answerResult, rateLimited, reveal, gameOver, notice, error, pong, kicked
 // 라운드 메시지(ready, answer, pass, playerError)는 roundId가 현재 라운드와 다르면 조용히 무시한다.
 // 공개(reveal) 전에는 곡 제목·별칭·정답 위치를 어떤 메시지에도 싣지 않는다.
 
-import { DIFFICULTY, buildChoices, canUseMultipleChoice, judgeAnswer, shuffle } from '../js/judge.js';
+import { DIFFICULTY, buildChoices, canUseMultipleChoice, itemCandidates, judgeAnswer, judgeItems, shuffle } from '../js/judge.js';
 import { MODE } from '../js/game.js';
-import { SCORING, answerWindow, scoreMulti } from '../js/scoring.js';
+import { SCORING, answerWindow, scoreExtremeBonus, scoreExtremeItem, scoreMulti } from '../js/scoring.js';
 import { pickSegmentStart } from '../js/segment.js';
 
 export const ROOM_PHASE = Object.freeze({
@@ -249,6 +251,8 @@ export class Room {
           left: p.left,
           isHost: p.id === this.hostId,
           status: round && this.isInGame ? (round.players.get(p.id)?.status ?? PLAYER_STATUS.ABSENT) : null,
+          // 매우 어려움: 이번 라운드에 맞힌 항목 개수(어떤 항목인지는 공개하지 않는다)
+          solved: round?.items && this.isInGame ? (round.players.get(p.id)?.solved.size ?? 0) : null,
         })),
       round: round && this.isInGame ? { id: round.id, index: this.roundIndex, total: this.totalRounds } : null,
     };
@@ -437,8 +441,7 @@ export class Room {
       mode: (v) => Object.values(MODE).includes(v),
       rounds: (v) => SCORING.roundOptions.includes(v),
       clipLength: (v) => SCORING.clipLengths.includes(v),
-      // 매우 어려움(항목별 맞히기)은 개인전 전용
-      difficulty: (v) => Object.values(DIFFICULTY).includes(v) && v !== DIFFICULTY.EXTREME,
+      difficulty: (v) => Object.values(DIFFICULTY).includes(v),
       answerTime: (v) => SCORING.multi.answerTimes.includes(v),
     };
     for (const [key, valid] of Object.entries(rules)) {
@@ -524,6 +527,8 @@ export class Room {
         correctOrder: null, // 정답 처리 순서(같은 ms 도착도 구분)
         elapsed: null,
         points: 0,
+        solved: new Map(), // 매우 어려움: 항목 → {points, elapsed}
+        bonus: 0,
       });
     }
     this.round = {
@@ -536,6 +541,8 @@ export class Room {
       deadlineAt: null,
       players,
       correctCount: 0,
+      // 매우 어려움: 맞혀야 할 항목 키(값은 공개 전까지 보내지 않는다)
+      items: this.difficulty === DIFFICULTY.EXTREME ? Object.keys(itemCandidates(song)) : null,
     };
     this.phase = ROOM_PHASE.PREPARING;
 
@@ -551,6 +558,8 @@ export class Room {
       clipLength: isRandom ? clipLength : null,
       answerWindow: this.round.window,
       choices: this.round.choices ? this.round.choices.map((c) => c.label) : null,
+      items: this.round.items,
+      attempts: this.maxWrongAttempts,
     };
     for (const p of this.members) {
       if (players.get(p.id).status === PLAYER_STATUS.PREPARING) this.sendToPlayer(p, prepare);
@@ -562,6 +571,11 @@ export class Room {
     }
     this.setTimer('ready', this.config.readyTimeoutMs, () => this.onReadyTimeout());
     this.evaluatePrep();
+  }
+
+  /** 라운드당 오답 기회(매우 어려움은 항목이 많아 더 준다) */
+  get maxWrongAttempts() {
+    return this.difficulty === DIFFICULTY.EXTREME ? SCORING.extreme.maxWrongAttempts : SCORING.maxWrongAttempts;
   }
 
   entriesOf(status) {
@@ -681,6 +695,10 @@ export class Room {
     }
     entry.lastAnswerAt = arrivedAt;
 
+    if (round.items) {
+      this.answerExtreme(player, entry, key, arrivedAt);
+      return;
+    }
     const correct = easy ? round.choices[key].correct : judgeAnswer(key, round.song, this.difficulty).correct;
     if (correct) {
       // 점수는 공개 때 반영한다(공개 전에는 다른 사람에게 점수 변화가 보이지 않게)
@@ -705,13 +723,80 @@ export class Room {
       return;
     }
     if (easy) entry.usedChoices.add(key);
+    this.registerWrong(player, entry);
+  }
+
+  registerWrong(player, entry) {
     entry.wrong++;
-    const attemptsLeft = Math.max(0, SCORING.maxWrongAttempts - entry.wrong);
-    this.sendToPlayer(player, { type: 'answerResult', roundId: round.id, correct: false, attemptsLeft });
+    const attemptsLeft = Math.max(0, this.maxWrongAttempts - entry.wrong);
+    this.sendToPlayer(player, { type: 'answerResult', roundId: this.round.id, correct: false, attemptsLeft });
     if (attemptsLeft === 0) {
       entry.status = PLAYER_STATUS.EXHAUSTED;
       this.afterLock(player, 'exhausted');
     }
+  }
+
+  /**
+   * 매우 어려움 답: 입력 하나를 남은 항목 전부와 비교한다. 맞힌 항목마다 도착 시간의 속도 점수를 가중치로 나눠 주고,
+   * 전부 맞히면 보너스와 함께 '정답'으로 잠근다. 이미 맞힌 항목만 다시 내면 기회를 줄이지 않는다.
+   * 답한 사람에게만: answerResult {correct, items, itemPoints, points(이번에 얻은 점수, 보너스 포함), total, bonus, complete, …}
+   */
+  answerExtreme(player, entry, text, arrivedAt) {
+    const round = this.round;
+    const { matched, already } = judgeItems(text, round.song, entry.solved.keys());
+    if (!matched.length) {
+      if (already.length) {
+        this.sendToPlayer(player, {
+          type: 'answerResult',
+          roundId: round.id,
+          correct: false,
+          already,
+          attemptsLeft: Math.max(0, this.maxWrongAttempts - entry.wrong),
+        });
+        return;
+      }
+      this.registerWrong(player, entry);
+      return;
+    }
+    const elapsed = (arrivedAt - round.startAt) / 1000;
+    const base = scoreMulti({
+      mode: this.settings.mode,
+      clipLength: this.settings.clipLength,
+      elapsed,
+      answerTime: this.settings.answerTime,
+    });
+    let gained = 0;
+    const itemPoints = {};
+    for (const item of matched) {
+      const points = scoreExtremeItem({ base, item, items: round.items });
+      entry.solved.set(item, { points, elapsed });
+      itemPoints[item] = points;
+      gained += points;
+    }
+    const complete = round.items.every((item) => entry.solved.has(item));
+    if (complete) {
+      entry.bonus = scoreExtremeBonus(base);
+      gained += entry.bonus;
+      entry.status = PLAYER_STATUS.CORRECT;
+      entry.correctOrder = ++round.correctCount;
+      entry.elapsed = elapsed;
+    }
+    entry.points += gained; // 점수는 공개 때 반영한다
+    this.sendToPlayer(player, {
+      type: 'answerResult',
+      roundId: round.id,
+      correct: true,
+      items: matched,
+      itemPoints,
+      points: gained,
+      total: entry.points,
+      bonus: entry.bonus,
+      complete,
+      elapsed,
+      order: complete ? entry.correctOrder : null,
+    });
+    if (complete) this.afterLock(player, 'correct');
+    else this.broadcastState(); // 다른 사람에게는 맞힌 항목 개수만 보인다
   }
 
   onPass(player, message) {
@@ -752,6 +837,18 @@ export class Room {
         }
         return { playerId: id, nickname: player?.nickname ?? null, elapsed: e.elapsed, points: e.points };
       });
+    // 매우 어려움: 일부만 맞힌 사람도 맞힌 항목 점수를 받는다(정답 수에는 넣지 않는다)
+    const partialPlayers = [];
+    if (round.items) {
+      for (const c of correctPlayers) c.solved = round.items.length;
+      for (const [id, e] of round.players) {
+        if (e.status === PLAYER_STATUS.CORRECT || e.solved.size === 0) continue;
+        const player = this.players.get(id);
+        if (player) player.score += e.points;
+        partialPlayers.push({ playerId: id, nickname: player?.nickname ?? null, points: e.points, solved: e.solved.size });
+      }
+      partialPlayers.sort((a, b) => b.solved - a.solved || b.points - a.points);
+    }
     const excluded = [];
     for (const [id, e] of round.players) {
       if ([PLAYER_STATUS.ERROR, PLAYER_STATUS.TIMEOUT, PLAYER_STATUS.ABSENT].includes(e.status)) {
@@ -767,6 +864,7 @@ export class Room {
       reason,
       correctPlayers,
       excluded,
+      ...(round.items ? { items: round.items, partialPlayers } : {}),
     };
     this.history.push(record);
     this.phase = ROOM_PHASE.REVEALED;
@@ -776,7 +874,7 @@ export class Room {
       type: 'reveal',
       roundId: round.id,
       ...record,
-      song: { videoId: song.videoId, title: song.title, anime: song.anime?.name ?? null, type: song.type ?? null },
+      song: { videoId: song.videoId, title: song.title, anime: song.anime?.name ?? null, artist: song.artist ?? null, type: song.type ?? null },
       scores: this.members.map((p) => ({ playerId: p.id, score: p.score })),
       nextVideoId: willContinue ? this.queue[0].videoId : null,
       hasNext: willContinue,

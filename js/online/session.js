@@ -25,8 +25,11 @@ export class OnlineSession {
     this.gameOver = null;
     this.lockedIds = new Set(); // 이번 라운드에 정답·오답 소진·포기한 사람
     this.attemptsLeft = SCORING.maxWrongAttempts;
-    this.myCorrect = null; // 이번 라운드에 내가 맞혔을 때 {points, elapsed, order}
-    this.feedback = null; // 'correct' | 'wrong' | 'rate' | null
+    this.myCorrect = null; // 이번 라운드에 내가 맞혔을 때 {points, elapsed, order} (매우 어려움은 전부 맞혔을 때)
+    this.maxAttempts = SCORING.maxWrongAttempts;
+    this.solved = new Map(); // 매우 어려움: 내가 맞힌 항목 → 점수
+    this.lastGain = null; // 매우 어려움: 방금 맞힌 {items, points} 또는 이미 맞힌 {already}
+    this.feedback = null; // 'correct' | 'partial' | 'already' | 'wrong' | 'rate' | null
     this.wrongChoices = new Set(); // 객관식에서 이미 틀린 보기 번호
     this.lastChoice = null;
     this.feedbackAt = 0;
@@ -60,6 +63,7 @@ export class OnlineSession {
       case 'prepare':
         this.resetRound();
         this.round = message;
+        if (message.attempts > 0) this.maxAttempts = this.attemptsLeft = message.attempts;
         this.playback.handleMessage(message);
         break;
       case 'go':
@@ -70,10 +74,25 @@ export class OnlineSession {
         if (this.round?.roundId === message.roundId) this.lockedIds.add(message.playerId);
         break;
       case 'answerResult':
-        if (this.round?.roundId === message.roundId && message.correct) {
+        if (this.round?.roundId !== message.roundId) break;
+        if (message.items) {
+          // 매우 어려움: 항목을 맞혔다(전부 맞히면 complete)
+          for (const item of message.items) this.solved.set(item, message.itemPoints?.[item] ?? null);
+          this.lastGain = { items: message.items, points: message.points };
+          if (message.complete) {
+            this.myCorrect = { points: message.total, elapsed: message.elapsed, order: message.order, bonus: message.bonus };
+            this.setFeedback('correct');
+          } else {
+            this.setFeedback('partial');
+          }
+        } else if (message.already) {
+          this.lastGain = { already: message.already };
+          this.attemptsLeft = message.attemptsLeft;
+          this.setFeedback('already');
+        } else if (message.correct) {
           this.myCorrect = { points: message.points, elapsed: message.elapsed, order: message.order };
           this.setFeedback('correct');
-        } else if (this.round?.roundId === message.roundId) {
+        } else {
           this.attemptsLeft = message.attemptsLeft;
           if (this.lastChoice != null) this.wrongChoices.add(this.lastChoice);
           this.setFeedback('wrong');
@@ -110,8 +129,11 @@ export class OnlineSession {
     this.go = null;
     this.reveal = null;
     this.lockedIds = new Set();
+    this.maxAttempts = SCORING.maxWrongAttempts;
     this.attemptsLeft = SCORING.maxWrongAttempts;
     this.myCorrect = null;
+    this.solved = new Map();
+    this.lastGain = null;
     this.feedback = null;
     this.wrongChoices = new Set();
     this.lastChoice = null;

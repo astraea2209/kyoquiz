@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PLAYER_STATUS, ROOM_PHASE } from '../server/room.js';
 import { createEnv } from './roomHelpers.js';
+import { makeSong } from './helpers.js';
 
 test('준비: prepare에는 곡 제목·별칭·작품명이 없다', () => {
   const env = createEnv();
@@ -574,4 +575,100 @@ test('여러 라운드에 걸쳐 점수가 쌓이고 타이머가 남지 않는�
   const over = env.last('a', 'gameOver');
   assert.deepEqual(over.ranking.map((r) => [r.nickname, r.score]), [['a', 296], ['b', 148]]);
   assert.equal(env.timers.pending(), 0);
+});
+
+// ---------- 매우 어려움 ----------
+function extremeEnv() {
+  const songs = Array.from({ length: 6 }, (_, i) => makeSong(i + 1, { duration: 200, artist: `Singer Name ${i + 1}` }));
+  const env = createEnv({ songs });
+  env.joinAll('a', 'b', 'c');
+  env.send('a', { type: 'settings', settings: { difficulty: 'extreme' } });
+  return env;
+}
+
+test('매우 어려움: prepare에는 항목 키와 기회 수만, 정답 값은 공개 전까지 없다', () => {
+  const env = extremeEnv();
+  assert.equal(env.state().settings.difficulty, 'extreme');
+  env.begin();
+  const prepare = env.prepare('a');
+  assert.deepEqual(prepare.items, ['title', 'artist', 'anime']);
+  assert.equal(prepare.attempts, 5);
+  const song = env.round().song;
+  env.timers.advance(4000);
+  env.answer('b', song.artist);
+  const everything = JSON.stringify([...env.inbox.values()]);
+  for (const secret of [song.title, song.artist, song.anime.name]) assert.ok(!everything.includes(secret));
+});
+
+test('매우 어려움: 항목마다 그 시점 속도 점수, 전부 맞혀야 잠기고 일부만 맞힌 사람도 점수', () => {
+  const env = extremeEnv();
+  env.begin();
+  const song = env.round().song;
+
+  env.timers.advance(4000); // 기본 140 → 가수 35
+  env.answer('b', song.artist.toLowerCase());
+  assert.deepEqual(env.last('b', 'answerResult'), {
+    type: 'answerResult', roundId: 1, correct: true, items: ['artist'], itemPoints: { artist: 35 },
+    points: 35, total: 35, bonus: 0, complete: false, elapsed: 4, order: null,
+  });
+  assert.equal(env.msgs('a', 'locked').length, 0, '일부만 맞히면 잠기지 않는다');
+  const b = () => env.state().players.find((p) => p.nickname === 'b');
+  assert.deepEqual([b().status, b().solved, b().score], [PLAYER_STATUS.READY, 1, 0]);
+  assert.equal(env.state().players[0].solved, 0, '다른 사람에게는 개수만');
+
+  env.timers.advance(1000); // 이미 맞힌 항목: 기회 유지
+  env.answer('b', song.artist);
+  assert.deepEqual(env.last('b', 'answerResult'), { type: 'answerResult', roundId: 1, correct: false, already: ['artist'], attemptsLeft: 5 });
+
+  env.answer('a', song.title); // 5초: 기본 138 → 제목 69 (같은 시각 b의 쿨다운과 무관)
+  assert.equal(env.last('a', 'answerResult').points, 69);
+
+  env.timers.advance(1000); // 6초: 기본 135 → 제목 68
+  env.answer('b', song.title);
+  env.timers.advance(2000); // 8초: 기본 130 → 작품명 33 + 보너스 65
+  env.answer('b', song.anime.aliases[0]);
+  const done = env.last('b', 'answerResult');
+  assert.deepEqual([done.points, done.total, done.bonus, done.complete, done.order], [98, 201, 65, true, 1]);
+  assert.deepEqual(env.last('a', 'locked'), { type: 'locked', roundId: 1, playerId: 'p2', reason: 'correct' });
+  assert.equal(b().status, PLAYER_STATUS.CORRECT);
+
+  env.passRest(); // a(1/3)와 c(0/3) 패스 → 공개
+  const reveal = env.last('c', 'reveal');
+  assert.deepEqual(reveal.items, ['title', 'artist', 'anime']);
+  assert.deepEqual(reveal.correctPlayers, [{ playerId: 'p2', nickname: 'b', elapsed: 8, points: 201, solved: 3 }]);
+  assert.deepEqual(reveal.partialPlayers, [{ playerId: 'p1', nickname: 'a', points: 69, solved: 1 }]);
+  assert.equal(reveal.song.artist, song.artist);
+  assert.deepEqual(reveal.scores, [
+    { playerId: 'p1', score: 69 },
+    { playerId: 'p2', score: 201 },
+    { playerId: 'p3', score: 0 },
+  ]);
+  const players = env.state().players;
+  assert.deepEqual(players.map((p) => p.correct), [0, 1, 0], '정답 수는 전부 맞힌 사람만');
+});
+
+test('매우 어려움: 오답 5번이면 소진, 맞힌 항목 점수는 공개 때 받는다', () => {
+  const env = extremeEnv();
+  env.begin();
+  const song = env.round().song;
+  env.answer('c', song.anime.name); // 0초: 기본 150 → 작품명 38
+  for (let i = 1; i <= 5; i++) {
+    env.timers.advance(1000);
+    env.answer('c', `틀린 답 ${i}`);
+    assert.equal(env.last('c', 'answerResult').attemptsLeft, 5 - i);
+  }
+  assert.deepEqual(env.last('a', 'locked'), { type: 'locked', roundId: 1, playerId: 'p3', reason: 'exhausted' });
+  env.passRest();
+  const reveal = env.last('a', 'reveal');
+  assert.deepEqual(reveal.partialPlayers, [{ playerId: 'p3', nickname: 'c', points: 38, solved: 1 }]);
+  assert.equal(env.state().players[2].score, 38);
+});
+
+test('매우 어려움이 아니면 prepare.items는 null, 기회 3번', () => {
+  const env = createEnv();
+  env.joinAll('a', 'b');
+  env.send('a', { type: 'start' });
+  assert.equal(env.prepare('a').items, null);
+  assert.equal(env.prepare('a').attempts, 3);
+  assert.equal(env.state().players[0].solved, null);
 });

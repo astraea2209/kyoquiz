@@ -238,3 +238,34 @@ test('gameOver: 결과 보관하고 재생 정지, 로비로 돌아오면 라운
   env.receive(roomState('lobby', [player('p1'), player('p2')]));
   assert.equal(env.session.round, null);
 });
+
+test('매우 어려움: 일부 맞힘·이미 맞힘·전부 맞힘', () => {
+  const env = setup();
+  env.receive({ type: 'joined', code: 'ABCDE', playerId: 'p2', token: 't' });
+  env.receive({ type: 'prepare', roundId: 3, index: 0, total: 5, mode: 'random', videoId: 'v', segmentStart: 10, clipLength: 5, answerWindow: 20, choices: null, items: ['title', 'artist', 'anime'], attempts: 5 });
+  env.receive(roomState('starting', [player('p1', { status: 'ready' }), player('p2', { status: 'ready' })]));
+  env.receive({ type: 'go', roundId: 3, startAt: 103_000, deadlineAt: 123_000 });
+  env.setNow(104_000);
+  const s = env.session;
+  assert.deepEqual([s.maxAttempts, s.attemptsLeft], [5, 5]);
+
+  env.receive({ type: 'answerResult', roundId: 3, correct: true, items: ['artist'], itemPoints: { artist: 35 }, points: 35, total: 35, bonus: 0, complete: false, elapsed: 1, order: null });
+  assert.equal(s.feedback, 'partial');
+  assert.deepEqual([...s.solved], [['artist', 35]]);
+  assert.equal(s.myCorrect, null);
+  assert.equal(s.canAnswer, true, '일부만 맞히면 계속 답할 수 있다');
+
+  env.receive({ type: 'answerResult', roundId: 3, correct: false, already: ['artist'], attemptsLeft: 5 });
+  assert.equal(s.feedback, 'already');
+  assert.deepEqual(s.lastGain, { already: ['artist'] });
+  assert.equal(s.attemptsLeft, 5);
+
+  env.receive({ type: 'answerResult', roundId: 3, correct: true, items: ['title', 'anime'], itemPoints: { title: 68, anime: 34 }, points: 170, total: 205, bonus: 68, complete: true, elapsed: 3, order: 1 });
+  assert.deepEqual(s.myCorrect, { points: 205, elapsed: 3, order: 1, bonus: 68 });
+  assert.equal(s.canAnswer, false);
+  assert.equal(s.solved.size, 3);
+
+  // 다음 라운드(보통 난이도)는 기회 3번으로 초기화
+  env.receive({ type: 'prepare', roundId: 4, index: 1, total: 5, mode: 'random', videoId: 'w', segmentStart: 1, clipLength: 5, choices: null, items: null, attempts: 3 });
+  assert.deepEqual([s.maxAttempts, s.attemptsLeft, s.solved.size, s.lastGain], [3, 3, 0, null]);
+});

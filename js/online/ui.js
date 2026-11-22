@@ -15,7 +15,14 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
 const MODE_LABEL = { [MODE.RANDOM]: '랜덤듣기', [MODE.FULL]: '전체듣기' };
-const DIFFICULTY_LABEL = { [DIFFICULTY.EASY]: '쉬움', [DIFFICULTY.NORMAL]: '보통', [DIFFICULTY.HARD]: '어려움' };
+const DIFFICULTY_LABEL = {
+  [DIFFICULTY.EASY]: '쉬움',
+  [DIFFICULTY.NORMAL]: '보통',
+  [DIFFICULTY.HARD]: '어려움',
+  [DIFFICULTY.EXTREME]: '매우 어려움',
+};
+const ITEM_LABEL = { title: '제목', artist: '가수', anime: '작품명' };
+const itemNames = (keys) => keys.map((key) => ITEM_LABEL[key]).join(', ');
 const STATUS_CHIP = {
   correct: '정답',
   passed: '포기',
@@ -71,7 +78,7 @@ const SETTING_GROUPS = [
   ['clipLength', '구간 길이', SCORING.clipLengths.map((n) => [n, `${n}초`])],
   ['answerTime', '답변 시간', SCORING.multi.answerTimes.map((n) => [n, `${n}초`])],
   ['rounds', '라운드', SCORING.roundOptions.map((n) => [n, `${n}`])],
-  ['difficulty', '난이도', [[DIFFICULTY.EASY, '쉬움'], [DIFFICULTY.NORMAL, '보통'], [DIFFICULTY.HARD, '어려움']]],
+  ['difficulty', '난이도', [[DIFFICULTY.EASY, '쉬움'], [DIFFICULTY.NORMAL, '보통'], [DIFFICULTY.HARD, '어려움'], [DIFFICULTY.EXTREME, '매우 어려움']]],
 ];
 
 export class OnlineApp {
@@ -447,6 +454,8 @@ export class OnlineApp {
       el('div', { class: 'progress', 'aria-label': '남은 시간' }, el('div', { class: 'progress-bar', id: 'on-progress-bar' })),
       el('p', { class: 'progress-label', id: 'on-progress-label' }),
       el('ul', { id: 'on-board', class: 'scoreboard' }),
+      // 매우 어려움: 내가 맞힌 항목. 정답 공개 중에도 보여 준다
+      el('ul', { id: 'on-extreme-items', class: 'extreme-items', 'aria-label': '맞힌 항목', hidden: true }),
       el(
         'div',
         { id: 'on-answer-area' },
@@ -514,12 +523,20 @@ export class OnlineApp {
     const s = this.session;
     const status = s.me?.status;
     if (s.myCorrect) {
-      return { text: `정답! +${s.myCorrect.points}점 · ${Number(s.myCorrect.elapsed).toFixed(1)}초 — 다른 사람을 기다리는 중…`, kind: 'ok' };
+      const head = s.round?.items ? `전부 정답! +${s.myCorrect.points}점(보너스 ${s.myCorrect.bonus ?? 0}점 포함)` : `정답! +${s.myCorrect.points}점`;
+      return { text: `${head} · ${Number(s.myCorrect.elapsed).toFixed(1)}초 — 다른 사람을 기다리는 중…`, kind: 'ok' };
     }
     if (status === 'exhausted') return { text: '기회를 모두 썼어요. 다른 사람을 기다리는 중…', kind: 'bad' };
     if (status === 'passed') return { text: '패스했어요. 다른 사람을 기다리는 중…', kind: '' };
     if (s.feedback === 'rate') return { text: '너무 빨라요. 1초 뒤에 다시 제출해 주세요.', kind: 'bad' };
     if (s.feedback === 'wrong') return { text: `틀렸어요. 남은 기회 ${s.attemptsLeft}번`, kind: 'bad' };
+    if (s.feedback === 'partial' && s.lastGain?.items) {
+      const left = (s.round?.items ?? []).filter((key) => !s.solved.has(key));
+      return { text: `${itemNames(s.lastGain.items)} 정답! +${s.lastGain.points}점 · 남은 항목: ${itemNames(left)}`, kind: 'ok' };
+    }
+    if (s.feedback === 'already' && s.lastGain?.already) {
+      return { text: `이미 맞힌 항목이에요(${itemNames(s.lastGain.already)}). 기회는 줄지 않아요.`, kind: '' };
+    }
     return { text: '', kind: '' };
   }
 
@@ -574,10 +591,14 @@ export class OnlineApp {
     $('#on-choices').hidden = !easy;
     $('#on-answer-form').hidden = easy;
     const left3 = s.attemptsLeft;
-    $('#on-attempts').textContent = `남은 기회 ${'●'.repeat(left3)}${'○'.repeat(SCORING.maxWrongAttempts - left3)}`;
+    $('#on-attempts').textContent = `남은 기회 ${'●'.repeat(left3)}${'○'.repeat(Math.max(0, s.maxAttempts - left3))}`;
     $('#on-answer-input').disabled = !canAnswer;
     $('#on-answer-form button').disabled = !canAnswer;
-    $('#on-answer-input').placeholder = round.difficulty === DIFFICULTY.HARD ? '곡 제목' : '곡 제목 또는 작품명';
+    $('#on-answer-input').placeholder = {
+      [DIFFICULTY.HARD]: '곡 제목',
+      [DIFFICULTY.EXTREME]: '제목, 가수, 작품명 중 하나씩 입력',
+    }[round.difficulty] ?? '곡 제목 또는 작품명';
+    this.renderExtremeItems(revealed);
     for (const [i, btn] of $$('#on-choices .btn').entries()) {
       const wrong = s.wrongChoices.has(i);
       btn.classList.toggle('wrong', wrong);
@@ -601,7 +622,18 @@ export class OnlineApp {
       const r = s.reveal;
       const result = $('#on-reveal-result');
       const corrects = r.correctPlayers ?? [];
-      if (corrects.length) {
+      const partials = r.partialPlayers ?? [];
+      if (r.items) {
+        // 매우 어려움: 전부 맞힌 사람과 일부만 맞힌 사람 모두 점수와 함께
+        const total = r.items.length;
+        const lines = [
+          ...corrects.map((c) => `${c.playerId === s.you ? '나' : c.nickname} ${total}/${total} +${c.points}점(${Number(c.elapsed).toFixed(1)}초)`),
+          ...partials.map((c) => `${c.playerId === s.you ? '나' : c.nickname} ${c.solved}/${total} +${c.points}점`),
+        ];
+        const mine = [...corrects, ...partials].some((c) => c.playerId === s.you);
+        result.textContent = lines.length ? lines.join(', ') : REASON_TEXT[r.reason] ?? '아무도 맞히지 못했어요';
+        result.className = `reveal-result ${lines.length ? (mine ? 'ok' : '') : 'bad'}`;
+      } else if (corrects.length) {
         const mine = corrects.some((c) => c.playerId === s.you);
         result.textContent = `정답 ${corrects.length}명: ${corrects
           .map((c) => `${c.playerId === s.you ? '나' : c.nickname} +${c.points}점(${Number(c.elapsed).toFixed(1)}초)`)
@@ -611,7 +643,10 @@ export class OnlineApp {
         result.textContent = REASON_TEXT[r.reason] ?? '아무도 맞히지 못했어요';
         result.className = 'reveal-result bad';
       }
-      $('#on-reveal-title').textContent = r.song.title;
+      $('#on-reveal-title').replaceChildren(
+        r.song.title,
+        ...(r.song.artist ? [el('span', { class: 'reveal-artist', text: ` / ${r.song.artist}` })] : []),
+      );
       $('#on-reveal-anime').textContent = [r.song.anime, r.song.type].filter(Boolean).join(' · ');
       const names = new Map(room.players.map((p) => [p.id, p.nickname]));
       $('#on-reveal-excluded').textContent = r.excluded?.length
@@ -621,6 +656,30 @@ export class OnlineApp {
     }
   }
 
+  /** 매우 어려움 항목 칸: 맞힌 항목은 답(공개 전에는 맞힌 표시와 점수), 공개 후에는 모든 정답 */
+  renderExtremeItems(revealed) {
+    const s = this.session;
+    const items = s.round?.items;
+    const list = $('#on-extreme-items');
+    list.hidden = !items;
+    if (!items) return;
+    const song = revealed ? s.reveal.song : null;
+    const value = (key) => (song ? { title: song.title, artist: song.artist, anime: song.anime }[key] ?? '' : '맞혔어요');
+    list.replaceChildren(
+      ...items.map((key) => {
+        const solved = s.solved.has(key);
+        const points = s.solved.get(key);
+        return el(
+          'li',
+          { class: solved ? 'solved' : revealed ? 'missed' : '' },
+          el('span', { class: 'item-label', text: ITEM_LABEL[key] }),
+          el('span', { class: 'item-value', text: solved || revealed ? value(key) : '?' }),
+          ...(solved && points != null ? [el('span', { class: 'item-points', text: `+${points}` })] : []),
+        );
+      }),
+    );
+  }
+
   renderBoard(revealed) {
     const s = this.session;
     const room = s.room;
@@ -628,7 +687,10 @@ export class OnlineApp {
       ...room.players
         .filter((p) => !p.left)
         .map((p) => {
-          const chip = !p.connected ? '연결 끊김' : STATUS_CHIP[p.status] ?? '';
+          // 매우 어려움: 아직 푸는 중인 사람은 맞힌 항목 개수만 보인다(어떤 항목인지는 숨김)
+          const total = s.round?.items?.length;
+          const progress = total && p.status === 'ready' && p.solved > 0 ? `${p.solved}/${total}` : '';
+          const chip = !p.connected ? '연결 끊김' : STATUS_CHIP[p.status] ?? progress;
           const winner = revealed && (s.reveal.correctPlayers ?? []).some((c) => c.playerId === p.id);
           return el(
             'li',
@@ -680,13 +742,20 @@ export class OnlineApp {
     $('#on-history').replaceChildren(
       ...(over?.history ?? []).map((h) => {
         const corrects = h.correctPlayers ?? [];
-        const mine = corrects.find((c) => c.playerId === s.you);
+        const partials = h.partialPlayers ?? [];
+        const mine = [...corrects, ...partials].find((c) => c.playerId === s.you);
+        const total = h.items?.length;
+        const names = [
+          ...corrects.map((c) => `${c.nickname} (${Number(c.elapsed).toFixed(1)}초)`),
+          ...partials.map((c) => `${c.nickname} (${c.solved}/${total})`),
+        ];
+        const mark = corrects.length ? '○ ' : partials.length ? '△ ' : '× ';
         return el(
           'li',
           {},
           el('span', { class: 'pts', text: mine ? `+${mine.points}점` : '' }),
-          el('span', { class: corrects.length ? 'ok' : 'bad', text: corrects.length ? '○ ' : '× ' }),
-          `${h.title} — ${corrects.length ? corrects.map((c) => `${c.nickname} (${Number(c.elapsed).toFixed(1)}초)`).join(', ') : '정답자 없음'}`,
+          el('span', { class: corrects.length || partials.length ? 'ok' : 'bad', text: mark }),
+          `${h.title} — ${names.length ? names.join(', ') : '정답자 없음'}`,
         );
       }),
     );
