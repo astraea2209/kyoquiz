@@ -217,6 +217,10 @@ export class App {
       if (this.game?.replay()) this.focusAnswer();
     });
     $('#pass-btn').addEventListener('click', () => this.game?.pass());
+    $('#hint-btn').addEventListener('click', () => {
+      // 힌트를 보고 바로 입력할 수 있게 입력칸으로 돌아간다
+      if (this.game?.useHint()) this.focusAnswer();
+    });
     // 패스 단축키 K(입력칸 밖에서), Esc로 입력칸 빠져나오기
     document.addEventListener('keydown', (event) => {
       if (this.screen !== 'game' || !this.game) return;
@@ -363,6 +367,12 @@ export class App {
     $('#replay-btn').disabled = !game.canReplay;
     $('#replay-btn').textContent = round.replayUsed ? '다시듣기 사용함' : '다시듣기 (-20점)';
     $('#pass-btn').hidden = revealed;
+    const hintBtn = $('#hint-btn');
+    hintBtn.hidden = revealed || game.difficulty === DIFFICULTY.EASY;
+    hintBtn.disabled = !game.canHint;
+    hintBtn.textContent = round.hint ? '힌트 사용함' : '초성 힌트 (-50%)';
+    $('#hint-text').hidden = round.hint == null;
+    $('#hint-text').textContent = round.hint ? `제목 초성: ${round.hint}` : '';
 
     // 답 입력
     $('#answer-area').hidden = revealed;
@@ -409,11 +419,12 @@ export class App {
   }
 
   revealText(result) {
-    const { reason, points, items, solved, bonus } = result;
-    if (!items) return RESULT_TEXT[reason](points);
-    if (reason === 'correct') return `전부 정답! +${points}점 (보너스 ${bonus}점 포함)`;
+    const { reason, points, items, solved, bonus, hintUsed } = result;
+    const hint = hintUsed && points > 0 ? ' · 힌트 사용' : '';
+    if (!items) return RESULT_TEXT[reason](points) + hint;
+    if (reason === 'correct') return `전부 정답! +${points}점 (보너스 ${bonus}점 포함)${hint}`;
     const why = { wrong: '기회 소진', pass: '패스', timeout: '시간 초과' }[reason];
-    return `${solved.length}/${items.length} 맞힘 — +${points}점 (${why})`;
+    return `${solved.length}/${items.length} 맞힘 — +${points}점 (${why})${hint}`;
   }
 
   buildChoices() {
@@ -483,6 +494,7 @@ export class App {
           el('span', { class: h.correct || partial ? 'ok' : 'bad', text: h.correct ? '○ ' : partial ? '△ ' : '× ' }),
           [h.song.title, h.song.anime?.name ?? h.song.artist].filter(Boolean).join(' — '),
           ...(h.items ? [` (${h.solved.length}/${h.items.length})`] : []),
+          ...(h.hintUsed ? [' (힌트)'] : []),
         );
       }),
     );

@@ -197,6 +197,8 @@ legend { color: var(--muted); font-size: 0.9rem; margin-bottom: 6px; }
 .controls { display: flex; gap: 8px; margin: 12px 0; }
 .controls .btn { flex: 1; }
 .controls .btn[hidden] { display: none; }
+/* 좁은 화면에서 버튼 3개(다시듣기·힌트·패스)가 한 줄 글자로 들어가게 */
+@media (max-width: 420px) { .controls .btn { padding: 0 6px; font-size: 0.9rem; } }
 
 .attempts { margin: 6px 0; color: var(--muted); }
 .choices { display: grid; grid-template-columns: 1fr; gap: 8px; }
@@ -302,6 +304,10 @@ textarea { min-height: 100px; margin: 8px 0; }
 .overlay-text { font-size: 1.15rem; font-weight: 600; }
 .settings fieldset:disabled { opacity: 0.55; }
 .settings fieldset:disabled span { cursor: default; }
+
+/* 초성 힌트 */
+.initial-hint { margin: 6px 0; padding: 6px 12px; background: var(--panel-2); border-radius: 10px; font-weight: 600; letter-spacing: 0.08em; color: var(--warn); }
+.initial-hint[hidden] { display: none; }
 
 /* 친구와 대결 채팅(대기실·게임·결과 화면을 옮겨 다닌다) */
 .chat { margin: 16px 0; }

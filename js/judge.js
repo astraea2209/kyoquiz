@@ -132,6 +132,32 @@ export function revealsAnswer(text, song) {
   return false;
 }
 
+const CHOSEONG = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+
+/**
+ * 초성 힌트. 한글 음절은 초성으로, 그 밖의 글자(영문 등)는 단어 첫 글자만 남기고 _로 가린다.
+ * 띄어쓰기·숫자·기호는 그대로 둔다.
+ * @example initialHint('사이하테') → 'ㅅㅇㅎㅌ', initialHint('KICK BACK') → 'K___ B___', initialHint('푸른 산호초 2') → 'ㅍㄹ ㅅㅎㅊ 2'
+ */
+export function initialHint(text) {
+  let out = '';
+  let inWord = false; // 한글 외 글자가 이어지는 중(첫 글자 다음부터 가린다)
+  for (const ch of String(text ?? '')) {
+    const code = ch.codePointAt(0);
+    if (code >= 0xac00 && code <= 0xd7a3) {
+      out += CHOSEONG[Math.floor((code - 0xac00) / 588)];
+      inWord = false;
+    } else if (/[\p{L}]/u.test(ch)) {
+      out += inWord ? '_' : ch;
+      inWord = true;
+    } else {
+      out += ch;
+      inWord = /[\p{M}]/u.test(ch) ? inWord : false;
+    }
+  }
+  return out;
+}
+
 /** 주관식 판정 */
 export function judgeAnswer(input, song, difficulty) {
   for (const candidate of answerCandidates(song, difficulty)) {

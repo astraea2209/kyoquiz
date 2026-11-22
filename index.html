@@ -114,6 +114,7 @@
       <div class="controls">
         <button type="button" class="btn primary" id="play-btn">재생</button>
         <button type="button" class="btn" id="replay-btn">다시듣기 (-20점)</button>
+        <button type="button" class="btn" id="hint-btn" title="곡 제목의 초성을 보여 줍니다. 이후 맞히면 점수가 절반">초성 힌트 (-50%)</button>
         <button type="button" class="btn ghost" id="pass-btn" title="단축키 K. 입력칸에 있을 때는 Esc를 누른 뒤 K" aria-keyshortcuts="K">패스 (K)</button>
       </div>
 
@@ -121,6 +122,7 @@
       <ul class="extreme-items" id="extreme-items" aria-label="맞힌 항목" hidden></ul>
       <div id="answer-area">
         <p class="attempts" id="attempts"></p>
+        <p class="initial-hint" id="hint-text" hidden></p>
         <div class="choices" id="choices"></div>
         <form id="answer-form" class="answer-form" autocomplete="off">
           <input

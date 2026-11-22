@@ -35,6 +35,8 @@ export class OnlineSession {
     this.feedback = null; // 'correct' | 'partial' | 'already' | 'wrong' | 'rate' | null
     this.wrongChoices = new Set(); // 객관식에서 이미 틀린 보기 번호
     this.lastChoice = null;
+    this.hint = null; // 이번 라운드에 받은 초성 힌트
+    this.hintRequested = false;
     this.feedbackAt = 0;
     this.kicked = false;
     this.chat = []; // 받은 채팅 {id, playerId, nickname, text, at} (최근 CHAT_LIMITS.keep개)
@@ -105,6 +107,9 @@ export class OnlineSession {
           this.setFeedback('wrong');
         }
         break;
+      case 'hint':
+        if (this.round?.roundId === message.roundId) this.hint = message.text;
+        break;
       case 'rateLimited':
         if (this.round?.roundId === message.roundId) this.setFeedback('rate');
         break;
@@ -155,6 +160,8 @@ export class OnlineSession {
     this.feedback = null;
     this.wrongChoices = new Set();
     this.lastChoice = null;
+    this.hint = null;
+    this.hintRequested = false;
   }
 
   addChat(list) {
@@ -195,6 +202,11 @@ export class OnlineSession {
     if (!this.round || this.reveal || !this.go || this.myCorrect) return false;
     if (this.clock.serverNow() < this.go.startAt) return false;
     return this.me?.status === 'ready';
+  }
+
+  /** 초성 힌트를 요청할 수 있는지(쉬움 제외, 답할 수 있을 때, 라운드당 1번) */
+  get canHint() {
+    return this.canAnswer && !this.round.choices && this.hint == null && !this.hintRequested;
   }
 
   /** 시작 신호까지 남은 초(없으면 null) */
@@ -252,6 +264,15 @@ export class OnlineSession {
     if (!this.canAnswer || !this.round?.choices || this.wrongChoices.has(index)) return false;
     this.lastChoice = index;
     return this.send({ type: 'answer', roundId: this.round.roundId, choice: index });
+  }
+
+  /** 초성 힌트 요청. 서버가 본인에게만 hint를 보내 준다 */
+  requestHint() {
+    if (!this.canHint) return false;
+    if (!this.send({ type: 'hint', roundId: this.round.roundId })) return false;
+    this.hintRequested = true;
+    this.emit('change');
+    return true;
   }
 
   pass() {

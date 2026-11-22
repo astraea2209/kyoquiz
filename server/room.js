@@ -9,16 +9,17 @@
 // 매우 어려움: 제목·가수·작품명(곡에 있는 항목)을 각자 맞힌 시점의 속도 점수로 나눠 받고, 전부 맞혀야 '정답'으로 잠긴다.
 // 일부만 맞힌 사람도 공개 때 그 점수를 받는다. 다른 사람에게는 맞힌 항목 개수(solved)만 보인다.
 //
-// 클라이언트 → 서버: join, settings, start, ready, answer, pass, playerError, chat, ping, leave
+// 클라이언트 → 서버: join, settings, start, ready, answer, pass, hint, playerError, chat, ping, leave
 // 서버 → 클라이언트: joined, state, prepare, go, locked, answerResult, rateLimited, reveal, gameOver, notice, error, pong, kicked,
-//                   chat, chatLog, chatBlocked
+//                   hint, chat, chatLog, chatBlocked
+// 초성 힌트: 쉬움 제외, 답할 수 있는 사람이 라운드당 1번 요청하면 본인에게만 제목 초성을 보낸다. 이후 얻는 점수는 SCORING.hint만큼 깎인다.
 // 채팅: 대기실·게임·결과 어디서나. 라운드 중(공개 전)에는 정답이 들어간 채팅을 막는다(chatBlocked {reason: 'answer'}).
 // 라운드 메시지(ready, answer, pass, playerError)는 roundId가 현재 라운드와 다르면 조용히 무시한다.
 // 공개(reveal) 전에는 곡 제목·별칭·정답 위치를 어떤 메시지에도 싣지 않는다.
 
-import { DIFFICULTY, buildChoices, canUseMultipleChoice, itemCandidates, judgeAnswer, judgeItems, revealsAnswer, shuffle } from '../js/judge.js';
+import { DIFFICULTY, buildChoices, canUseMultipleChoice, initialHint, itemCandidates, judgeAnswer, judgeItems, revealsAnswer, shuffle } from '../js/judge.js';
 import { MODE } from '../js/game.js';
-import { SCORING, answerWindow, isValidRounds, scoreExtremeBonus, scoreExtremeItem, scoreMulti } from '../js/scoring.js';
+import { SCORING, answerWindow, applyHint, isValidRounds, scoreExtremeBonus, scoreExtremeItem, scoreMulti } from '../js/scoring.js';
 import { pickSegmentStart } from '../js/segment.js';
 
 export const ROOM_PHASE = Object.freeze({
@@ -185,6 +186,8 @@ export class Room {
         return this.onAnswer(player, message);
       case 'pass':
         return this.onPass(player, message);
+      case 'hint':
+        return this.onHint(player, message);
       case 'playerError':
         return this.onPlayerError(player, message);
       case 'chat':
@@ -262,6 +265,8 @@ export class Room {
           status: round && this.isInGame ? (round.players.get(p.id)?.status ?? PLAYER_STATUS.ABSENT) : null,
           // 매우 어려움: 이번 라운드에 맞힌 항목 개수(어떤 항목인지는 공개하지 않는다)
           solved: round?.items && this.isInGame ? (round.players.get(p.id)?.solved.size ?? 0) : null,
+          // 이번 라운드에 초성 힌트를 봤는지(힌트 내용은 본인에게만 보낸다)
+          hint: round && this.isInGame ? !!round.players.get(p.id)?.hintUsed : null,
         })),
       round: round && this.isInGame ? { id: round.id, index: this.roundIndex, total: this.totalRounds } : null,
     };
@@ -574,6 +579,7 @@ export class Room {
         points: 0,
         solved: new Map(), // 매우 어려움: 항목 → {points, elapsed}
         bonus: 0,
+        hintUsed: false,
       });
     }
     this.round = {
@@ -750,12 +756,7 @@ export class Room {
       entry.status = PLAYER_STATUS.CORRECT;
       entry.correctOrder = ++round.correctCount;
       entry.elapsed = (arrivedAt - round.startAt) / 1000;
-      entry.points = scoreMulti({
-        mode: this.settings.mode,
-        clipLength: this.settings.clipLength,
-        elapsed: entry.elapsed,
-        answerTime: this.settings.answerTime,
-      });
+      entry.points = this.speedScore(entry, entry.elapsed);
       this.sendToPlayer(player, {
         type: 'answerResult',
         roundId: round.id,
@@ -804,12 +805,7 @@ export class Room {
       return;
     }
     const elapsed = (arrivedAt - round.startAt) / 1000;
-    const base = scoreMulti({
-      mode: this.settings.mode,
-      clipLength: this.settings.clipLength,
-      elapsed,
-      answerTime: this.settings.answerTime,
-    });
+    const base = this.speedScore(entry, elapsed);
     let gained = 0;
     const itemPoints = {};
     for (const item of matched) {
@@ -842,6 +838,28 @@ export class Room {
     });
     if (complete) this.afterLock(player, 'correct');
     else this.broadcastState(); // 다른 사람에게는 맞힌 항목 개수만 보인다
+  }
+
+  /** 맞힌 시점의 속도 점수. 초성 힌트를 봤으면 깎는다 */
+  speedScore(entry, elapsed) {
+    const points = scoreMulti({
+      mode: this.settings.mode,
+      clipLength: this.settings.clipLength,
+      elapsed,
+      answerTime: this.settings.answerTime,
+    });
+    return applyHint(points, entry.hintUsed);
+  }
+
+  /** 초성 힌트 요청: 쉬움 제외, 시작 신호 뒤 답할 수 있는 사람만, 라운드당 1번. 본인에게만 hint를 보낸다 */
+  onHint(player, message) {
+    const entry = this.roundEntry(player, message, [ROOM_PHASE.STARTING, ROOM_PHASE.ANSWERING]);
+    const round = this.round;
+    if (!entry || entry.status !== PLAYER_STATUS.READY || entry.hintUsed) return;
+    if (this.difficulty === DIFFICULTY.EASY || this.now() < round.startAt) return;
+    entry.hintUsed = true;
+    this.sendToPlayer(player, { type: 'hint', roundId: round.id, text: initialHint(round.song.title) });
+    this.broadcastState();
   }
 
   onPass(player, message) {
@@ -880,7 +898,7 @@ export class Room {
           player.score += e.points;
           player.correct++;
         }
-        return { playerId: id, nickname: player?.nickname ?? null, elapsed: e.elapsed, points: e.points };
+        return { playerId: id, nickname: player?.nickname ?? null, elapsed: e.elapsed, points: e.points, hint: e.hintUsed };
       });
     // 매우 어려움: 일부만 맞힌 사람도 맞힌 항목 점수를 받는다(정답 수에는 넣지 않는다)
     const partialPlayers = [];
@@ -890,7 +908,7 @@ export class Room {
         if (e.status === PLAYER_STATUS.CORRECT || e.solved.size === 0) continue;
         const player = this.players.get(id);
         if (player) player.score += e.points;
-        partialPlayers.push({ playerId: id, nickname: player?.nickname ?? null, points: e.points, solved: e.solved.size });
+        partialPlayers.push({ playerId: id, nickname: player?.nickname ?? null, points: e.points, solved: e.solved.size, hint: e.hintUsed });
       }
       partialPlayers.sort((a, b) => b.solved - a.solved || b.points - a.points);
     }

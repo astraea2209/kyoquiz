@@ -584,6 +584,7 @@ export class OnlineApp {
         'div',
         { id: 'on-answer-area' },
         el('p', { class: 'attempts', id: 'on-attempts' }),
+        el('p', { class: 'initial-hint', id: 'on-hint-text', hidden: true }),
         el('div', { class: 'choices', id: 'on-choices' }),
         el(
           'form',
@@ -592,7 +593,12 @@ export class OnlineApp {
           el('button', { type: 'submit', class: 'btn primary', text: '제출' }),
         ),
         el('p', { class: 'feedback', id: 'on-feedback', role: 'status' }),
-        el('div', { class: 'controls' }, el('button', { type: 'button', class: 'btn ghost', id: 'on-pass', text: '패스 (K)', title: '단축키 K. 입력칸에 있을 때는 Esc를 누른 뒤 K', 'aria-keyshortcuts': 'K', onclick: () => this.session?.pass() })),
+        el(
+          'div',
+          { class: 'controls' },
+          el('button', { type: 'button', class: 'btn', id: 'on-hint', text: '초성 힌트 (-50%)', title: '곡 제목의 초성을 나에게만 보여 줍니다. 이후 맞히면 점수가 절반', onclick: () => this.requestHint() }),
+          el('button', { type: 'button', class: 'btn ghost', id: 'on-pass', text: '패스 (K)', title: '단축키 K. 입력칸에 있을 때는 Esc를 누른 뒤 K', 'aria-keyshortcuts': 'K', onclick: () => this.session?.pass() }),
+        ),
       ),
       el(
         'div',
@@ -605,6 +611,11 @@ export class OnlineApp {
       ),
       el('div', { class: 'chat-slot' }),
     );
+  }
+
+  requestHint() {
+    // 힌트를 보고 바로 입력할 수 있게 입력칸으로 돌아간다
+    if (this.session?.requestHint()) $('#on-answer-input').focus();
   }
 
   submitAnswer(event) {
@@ -730,6 +741,12 @@ export class OnlineApp {
       btn.disabled = wrong || !canAnswer;
     }
     $('#on-pass').disabled = !canAnswer;
+    const hintBtn = $('#on-hint');
+    hintBtn.hidden = easy;
+    hintBtn.disabled = !s.canHint;
+    hintBtn.textContent = s.hint != null || s.hintRequested ? '힌트 사용함' : '초성 힌트 (-50%)';
+    $('#on-hint-text').hidden = s.hint == null;
+    $('#on-hint-text').textContent = s.hint != null ? `제목 초성: ${s.hint}` : '';
     // 답할 수 있게 되는 순간 입력칸에 자동 포커스(매 라운드 다시 클릭하지 않아도 되게)
     if (canAnswer && !this.answerWasReady && !easy) {
       const input = $('#on-answer-input');
@@ -754,8 +771,8 @@ export class OnlineApp {
         // 매우 어려움: 전부 맞힌 사람과 일부만 맞힌 사람 모두 점수와 함께
         const total = r.items.length;
         const lines = [
-          ...corrects.map((c) => `${c.playerId === s.you ? '나' : c.nickname} ${total}/${total} +${c.points}점(${Number(c.elapsed).toFixed(1)}초)`),
-          ...partials.map((c) => `${c.playerId === s.you ? '나' : c.nickname} ${c.solved}/${total} +${c.points}점`),
+          ...corrects.map((c) => `${c.playerId === s.you ? '나' : c.nickname} ${total}/${total} +${c.points}점(${Number(c.elapsed).toFixed(1)}초${c.hint ? ', 힌트' : ''})`),
+          ...partials.map((c) => `${c.playerId === s.you ? '나' : c.nickname} ${c.solved}/${total} +${c.points}점${c.hint ? '(힌트)' : ''}`),
         ];
         const mine = [...corrects, ...partials].some((c) => c.playerId === s.you);
         result.textContent = lines.length ? lines.join(', ') : REASON_TEXT[r.reason] ?? '아무도 맞히지 못했어요';
@@ -763,7 +780,7 @@ export class OnlineApp {
       } else if (corrects.length) {
         const mine = corrects.some((c) => c.playerId === s.you);
         result.textContent = `정답 ${corrects.length}명: ${corrects
-          .map((c) => `${c.playerId === s.you ? '나' : c.nickname} +${c.points}점(${Number(c.elapsed).toFixed(1)}초)`)
+          .map((c) => `${c.playerId === s.you ? '나' : c.nickname} +${c.points}점(${Number(c.elapsed).toFixed(1)}초${c.hint ? ', 힌트' : ''})`)
           .join(', ')}`;
         result.className = `reveal-result ${mine ? 'ok' : ''}`;
       } else {
@@ -824,6 +841,7 @@ export class OnlineApp {
             { class: `${p.id === s.you ? 'me' : ''} ${winner ? 'winner' : ''}`.trim() },
             el('span', { class: 'name', text: p.nickname }),
             chip ? el('span', { class: 'chip', text: chip }) : '',
+            p.hint ? el('span', { class: 'chip', text: '힌트' }) : '',
             el('span', { class: 'pts', text: `${p.score}점` }),
           );
         }),
@@ -874,8 +892,8 @@ export class OnlineApp {
         const mine = [...corrects, ...partials].find((c) => c.playerId === s.you);
         const total = h.items?.length;
         const names = [
-          ...corrects.map((c) => `${c.nickname} (${Number(c.elapsed).toFixed(1)}초)`),
-          ...partials.map((c) => `${c.nickname} (${c.solved}/${total})`),
+          ...corrects.map((c) => `${c.nickname} (${Number(c.elapsed).toFixed(1)}초${c.hint ? ', 힌트' : ''})`),
+          ...partials.map((c) => `${c.nickname} (${c.solved}/${total}${c.hint ? ', 힌트' : ''})`),
         ];
         const mark = corrects.length ? '○ ' : partials.length ? '△ ' : '× ';
         return el(

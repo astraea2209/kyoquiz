@@ -27,6 +27,8 @@ export const SCORING = Object.freeze({
     completeBonus: 0.5,
     maxWrongAttempts: 5,
   }),
+  // 초성 힌트(쉬움 제외). 힌트를 본 뒤 얻는 점수에 곱한다(매우 어려움은 힌트 뒤에 맞힌 항목·보너스만)
+  hint: Object.freeze({ scoreFactor: 0.5 }),
   maxWrongAttempts: 3,
   replaysPerRound: 1,
   clipLengths: Object.freeze([3, 5, 10, 15]),
@@ -51,6 +53,11 @@ export function parseRounds(input) {
   if (!/^\d+$/.test(text)) return null;
   const { min, max } = SCORING.roundLimits;
   return Math.min(max, Math.max(min, Number(text)));
+}
+
+/** 힌트를 봤으면 점수를 깎는다(SCORING.hint.scoreFactor) */
+export function applyHint(points, hintUsed, cfg = SCORING.hint) {
+  return hintUsed ? Math.round(points * cfg.scoreFactor) : points;
 }
 
 /** 랜덤듣기 정답 점수 */

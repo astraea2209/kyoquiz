@@ -91,8 +91,8 @@ test('정답: 맞힌 사람만 잠기고 라운드는 계속, 전원이 끝나�
   const reveal = env.last('a', 'reveal');
   assert.equal(reveal.reason, 'done');
   assert.deepEqual(reveal.correctPlayers, [
-    { playerId: 'p2', nickname: 'b', elapsed: 4, points: 140 },
-    { playerId: 'p1', nickname: 'a', elapsed: 10, points: 125 }, // 100 × (1 + 0.5 × (1 − 10/20))
+    { playerId: 'p2', nickname: 'b', elapsed: 4, points: 140, hint: false },
+    { playerId: 'p1', nickname: 'a', elapsed: 10, points: 125, hint: false }, // 100 × (1 + 0.5 × (1 − 10/20))
   ]);
   assert.equal(reveal.song.title, title);
   assert.deepEqual(reveal.scores, [{ playerId: 'p1', score: 125 }, { playerId: 'p2', score: 140 }, { playerId: 'p3', score: 0 }]);
@@ -635,8 +635,8 @@ test('매우 어려움: 항목마다 그 시점 속도 점수, 전부 맞혀야 
   env.passRest(); // a(1/3)와 c(0/3) 패스 → 공개
   const reveal = env.last('c', 'reveal');
   assert.deepEqual(reveal.items, ['title', 'artist', 'anime']);
-  assert.deepEqual(reveal.correctPlayers, [{ playerId: 'p2', nickname: 'b', elapsed: 8, points: 201, solved: 3 }]);
-  assert.deepEqual(reveal.partialPlayers, [{ playerId: 'p1', nickname: 'a', points: 69, solved: 1 }]);
+  assert.deepEqual(reveal.correctPlayers, [{ playerId: 'p2', nickname: 'b', elapsed: 8, points: 201, solved: 3, hint: false }]);
+  assert.deepEqual(reveal.partialPlayers, [{ playerId: 'p1', nickname: 'a', points: 69, solved: 1, hint: false }]);
   assert.equal(reveal.song.artist, song.artist);
   assert.deepEqual(reveal.scores, [
     { playerId: 'p1', score: 69 },
@@ -660,7 +660,7 @@ test('매우 어려움: 오답 5번이면 소진, 맞힌 항목 점수는 공개
   assert.deepEqual(env.last('a', 'locked'), { type: 'locked', roundId: 1, playerId: 'p3', reason: 'exhausted' });
   env.passRest();
   const reveal = env.last('a', 'reveal');
-  assert.deepEqual(reveal.partialPlayers, [{ playerId: 'p3', nickname: 'c', points: 38, solved: 1 }]);
+  assert.deepEqual(reveal.partialPlayers, [{ playerId: 'p3', nickname: 'c', points: 38, solved: 1, hint: false }]);
   assert.equal(env.state().players[2].score, 38);
 });
 

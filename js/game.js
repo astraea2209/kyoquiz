@@ -6,8 +6,8 @@
 //   onStateChange(cb(state)) → 구독 해제 함수,  onError(cb(code)) → 구독 해제 함수
 // state 값은 PLAYER_STATE 참고.
 
-import { DIFFICULTY, buildChoices, canUseMultipleChoice, itemCandidates, judgeAnswer, judgeItems, shuffle } from './judge.js';
-import { SCORING, scoreExtremeBonus, scoreExtremeItem, scoreFull, scoreRandom } from './scoring.js';
+import { DIFFICULTY, buildChoices, canUseMultipleChoice, initialHint, itemCandidates, judgeAnswer, judgeItems, shuffle } from './judge.js';
+import { SCORING, applyHint, scoreExtremeBonus, scoreExtremeItem, scoreFull, scoreRandom } from './scoring.js';
 import { pickSegmentStart } from './segment.js';
 
 export const MODE = Object.freeze({ RANDOM: 'random', FULL: 'full' });
@@ -167,6 +167,7 @@ export class GameSession {
       song,
       segmentStart: this.isRandom ? null : 0,
       replayUsed: false,
+      hint: null, // 초성 힌트를 봤으면 그 글자(제목 초성)
       wrongCount: 0,
       choices: this.difficulty === DIFFICULTY.EASY ? buildChoices(song, this.allSongs, this.rng) : null,
       disabledChoices: new Set(),
@@ -257,6 +258,19 @@ export class GameSession {
     );
   }
 
+  /** 초성 힌트를 볼 수 있는지(쉬움 제외, 소리를 들은 뒤 답할 수 있을 때, 라운드당 1번) */
+  get canHint() {
+    return this.difficulty !== DIFFICULTY.EASY && this.canAnswer && this.round.hint == null;
+  }
+
+  /** 제목 초성 힌트를 연다. 이후 맞히면 점수가 줄어든다(SCORING.hint). @returns 힌트 글자 또는 null */
+  useHint() {
+    if (!this.canHint) return null;
+    this.round.hint = initialHint(this.round.song.title);
+    this.changed();
+    return this.round.hint;
+  }
+
   get canAnswer() {
     return (
       !!this.round &&
@@ -292,11 +306,12 @@ export class GameSession {
     return this.registerWrong();
   }
 
-  /** 지금 맞히면 받을 라운드 기본 점수(랜덤: 구간·다시듣기, 전체: 경과 시간) */
+  /** 지금 맞히면 받을 라운드 기본 점수(랜덤: 구간·다시듣기, 전체: 경과 시간, 힌트를 봤으면 깎음) */
   currentBase() {
-    return this.isRandom
+    const base = this.isRandom
       ? scoreRandom({ clipLength: this.settings.clipLength, replayUsed: this.round.replayUsed })
       : scoreFull({ elapsed: this.audibleElapsed(), timeLimit: this.settings.timeLimit });
+    return applyHint(base, this.round.hint != null);
   }
 
   /**
@@ -393,6 +408,7 @@ export class GameSession {
       correct: reason === 'correct',
       points,
       elapsed: this.isRandom ? null : this.audibleElapsed(),
+      hintUsed: round.hint != null,
     };
     if (this.isExtreme) {
       round.result.items = round.items.slice();
