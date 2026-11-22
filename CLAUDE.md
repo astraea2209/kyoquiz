@@ -33,12 +33,15 @@
 2. 곡 정보 확인: 영상 제목·채널은 oEmbed(`https://www.youtube.com/oembed?url=<watch URL>&format=json`), 타이업(애니 OP·ED, 게임 주제가 등)은 watch 페이지 `shortDescription`에서 主題歌·テーマ·アニメ·ゲーム 같은 줄만 골라 본다. 검색 결과 HTML은 받지 않는다(토큰 절약). 스크립트는 셸 따옴표가 꼬이기 쉬우니 scratchpad에 `.mjs` 파일로 써서 실행
 3. 항목 작성. 필드 순서는 id, videoId, title, titleAliases, anime, artist, artistAliases, type, hookStart, skipStart, skipEnd, duration, enabled
    - `id`: 작품 곡은 `bleach-op2`처럼 `작품-op번호`, 일반 노래는 `9lana-only-way`처럼 `가수-곡`(영문 소문자, 하이픈)
-   - `title`: 한국어 표기(일본어는 뜻을 옮기거나 음역, 예: ほうき星 → 혜성). 원제·로마자·영어·띄어쓰기 변형은 `titleAliases`. 영어 제목은 그대로 두고 한국어 읽기를 별칭에 넣는다
-   - `anime`: `{name: 한국어 작품명, aliases: [원제, 영어 제목, 시즌명 등]}`. 게임 곡은 `name`에 게임 이름. 작품이 없는 일반 노래는 필드 자체를 넣지 않는다
-   - `artist`: 한국어 표기가 있으면 한국어(예: 요네즈 켄시), 영문·원어 활동명은 그대로(예: YOASOBI, TK from 凛として時雨). 다른 표기는 `artistAliases`(예: 9Lana → 쿠라나)
+   - **표기 원칙: 제목, 작품명, 가수와 모든 별칭에 일본어(히라가나·가타카나·한자)를 적지 않는다.** 한국에서 부르는 이름으로 적고, 모르면 추측하지 말고 사용자에게 묻는다
+   - **로마자(일본어를 영문자로 적은 것, 예: Guren no Yumiya, Jujutsu Kaisen)도 적지 않고** 한국어 발음(구렌노 유미야, 주주츠 카이센)으로 별칭에 넣는다. 영어 번역 제목(A Cruel Angel's Thesis, Attack on Titan)은 별칭에 넣어도 된다
+   - **영문 제목·영문 활동명은 그대로 적고, 한국에서 부르는 이름을 별칭에 넣는다**(예: KICK BACK → 킥백, LiSA → 리사, YOASOBI → 요아소비)
+   - `title`: 한국에서 부르는 제목. 일본어 제목은 뜻을 옮기거나(ほうき星 → 혜성) 한국에서 굳어진 발음(사이하테)으로 쓰고, 한국어 발음·띄어쓰기 변형을 `titleAliases`에 넣는다(혜성 → 호우키보시)
+   - `anime`: `{name: 한국어 작품명, aliases: [줄임말, 영어 제목, 시즌명, 한국어 발음 등]}`. 게임 곡은 `name`에 게임 이름. 작품이 없는 일반 노래는 필드 자체를 넣지 않는다
+   - `artist`: 한국어 표기가 있으면 한국어(예: 요네즈 켄시, 윤하), 영문 활동명은 그대로(예: YOASOBI). 일본어 글자가 섞인 활동명은 공식 영문 표기나 한국어로 바꾼다(Official髭男dism → Official HIGE DANdism, 凛として時雨 → 린토시테시구레). 한국에서 부르는 다른 이름은 `artistAliases`(예: 9Lana → 쿠라나, Official HIGE DANdism → 히게단)
    - `type`: OP, ED, 삽입곡, OST(게임 주제가 포함), 캐릭터송, 일반곡, 기타
    - 노래만 있는 영상이 아니면(예: 14분짜리 영상) `enabled: false`
-   - 공식 번역명을 확인하지 못한 작품명·곡 제목은 사용자에게 알린다(원제는 별칭에 있어 정답 인정에는 문제없음)
+   - 공식 한국어 이름을 확인하지 못한 작품명·곡 제목·가수명은 넣기 전에 사용자에게 묻는다(일본어 원제를 별칭으로 남기지 않으므로 이름이 틀리면 정답 인정도 틀어진다)
 4. 저장: 기존 줄은 그대로 두고 끝에 추가한다. 형식은 `formatSongsJson`(`tools/check-songs.mjs`)과 같게(곡마다 필드 한 줄, 배열과 `anime`는 한 줄). 스크립트로 넣을 때는 이 함수를 import해 쓴다
 5. 점검: `node tools/check-songs.mjs --write`(존재·임베드 가능 확인, `duration` 채움)와 `node --test`
 6. 반영: 커밋 → `main` push(GitHub Pages 자동 갱신, 1~2분) → `npm run server:deploy`(대결 서버는 songs.json을 배포 번들에 담으므로 다시 배포해야 대결에 새 곡이 나온다. 진행 중인 방은 사라짐). push와 배포는 사용자에게 먼저 묻는다. 확인은 `https://astraea2209.github.io/kyoquiz/songs.json`의 곡 수와 서버 `/api/health`
@@ -59,7 +62,7 @@
 - `js/linkParser.js`: YouTube 링크에서 videoId와 `t=` 시작 시간 추출
 - `js/volume.js`: 노래 볼륨(0~100, 기본 80, localStorage `asq.volume`). `VolumeControl`이 개인전·친구와 대결 플레이어 모두에 `setVolume`을 적용하고, 슬라이더(시작 화면, 개인전 게임, 대기실, 대결 게임)는 `bindVolumeInput`으로 같은 값을 공유한다. `js/player.js`는 `unMute` 때 볼륨을 다시 적용한다
 - `js/songs.js`: 곡 스키마(애니송과 일반 노래 공용), songs.json과 localStorage 병합, 영상 길이 캐시, 최고 점수, 설정 저장. 곡 필드: id, videoId, title(유일한 필수값), titleAliases, anime{name, aliases}(선택, 일반 노래는 필드 자체가 없음), artist·artistAliases(선택, 표시·저장만 하고 정답 인정 안 함), type(`SONG_TYPES`: OP, ED, 삽입곡, OST, 캐릭터송, 일반곡, 기타. 비우면 작품이 있으면 OP, 없으면 일반곡), hookStart·skipStart·skipEnd·duration(선택, 초), enabled. 화면에서 `song.anime`은 없을 수 있으니 `?.`로 읽는다
-- `songs.json`: 기본 곡 목록(52곡: 유명 애니 OP 12곡 + 블리치 OP·ED 15곡 + 9Lana(쿠라나) 13곡 + 2026년 애니 OP·ED 12곡(대전 감사합니다 2, 담배 고양이 2, 슈퍼 뒤에서 담배 피우는 두 사람 4, 야생의 라스트 보스가 나타났다! 4. 야생은 1기 2곡과 2기 2곡이 같은 `anime`를 쓴다), 공식 채널 영상 위주. 9Lana 곡은 오리지널 10곡(`일반곡`, `anime` 없음), 애니 ED 2곡, 게임 주제가 1곡. 블리치 ほうき星 영상은 14분짜리라 `enabled:false`). 2026 곡의 작품명은 사용자가 준 한국어 제목을 그대로 썼고 공식 번역명은 확인하지 못함(원제는 `aliases`에 있음). 표기·필드 규칙은 위 "곡 추가 절차". `duration`은 점검 스크립트 `--write`로 채움(있으면 게임이 길이 측정용 음소거 로드를 건너뜀). `hookStart`는 아직 없음. `songs.sample.json`: 형식 예시(자리표시자 값)
+- `songs.json`: 기본 곡 목록(52곡: 유명 애니 OP 12곡 + 블리치 OP·ED 15곡 + 9Lana(쿠라나) 13곡 + 2026년 애니 OP·ED 12곡(대전 감사합니다 2, 담배 고양이 2, 슈퍼 뒤에서 담배 피우는 두 사람 4, 야생의 라스트 보스가 나타났다! 4. 야생은 1기 2곡과 2기 2곡이 같은 `anime`를 쓴다), 공식 채널 영상 위주. 9Lana 곡은 오리지널 10곡(`일반곡`, `anime` 없음), 애니 ED 2곡, 게임 주제가 1곡. 블리치 ほうき星 영상은 14분짜리라 `enabled:false`). 2026 곡의 작품명은 사용자가 준 한국어 제목을 그대로 썼다. 모든 곡의 제목·작품명·가수·별칭에서 일본어 글자와 로마자 별칭을 뺐다(2026-11-22, 한국어 발음 별칭으로 대신함). 표기·필드 규칙은 위 "곡 추가 절차". `duration`은 점검 스크립트 `--write`로 채움(있으면 게임이 길이 측정용 음소거 로드를 건너뜀). `hookStart`는 아직 없음. `songs.sample.json`: 형식 예시(자리표시자 값)
 - `tools/check-songs.mjs`: songs.json 점검(oEmbed로 존재·임베드 가능 여부와 채널명, watch 페이지 `lengthSeconds`로 길이, duration 차이, id·videoId 중복). 순수 함수는 export해 `tests/checkSongs.test.js`에서 네트워크 없이 테스트. `formatSongsJson`은 `tools/merge-songs.mjs`도 쓴다
 - `tools/merge-songs.mjs`: 곡 JSON 합치기(`mergeSongLists`, `orderSongFields`, `diffFields`). 테스트는 `tests/mergeSongs.test.js`
 - `tests/`: 단위 테스트 파일 17개(가짜 플레이어·시계·타이머·소켓 포함)
