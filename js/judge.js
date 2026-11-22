@@ -56,14 +56,39 @@ export function answerCandidates(song, difficulty) {
   return [...titles, anime.name, ...(anime.aliases ?? [])].filter(Boolean);
 }
 
+// 여러 명이 부른 곡의 가수 구분자. 'and'와 '+'는 이름 안에 들어가는 경우가 많아(HIGH and MIGHTY COLOR,
+// Aiobahn +81) 나누지 않는다. 'x'는 앞뒤에 공백이 있을 때만(A x B).
+const ARTIST_SEPARATORS = /\s*(?:×|&|,|、|\/|\s+x\s+|\s+(?:feat\.?|ft\.|featuring|with)\s+)\s*/i;
+
+/**
+ * 가수 표기를 한 사람(팀)씩 나눈다. 나눌 게 없으면 빈 배열.
+ * 'THE 아케보시 로켓'처럼 앞의 THE는 빼고 부르는 경우가 많아 뺀 이름도 넣는다.
+ * @example splitArtistNames('키시다 교단 & THE 아케보시 로켓') → ['키시다 교단', 'THE 아케보시 로켓', '아케보시 로켓']
+ */
+export function splitArtistNames(artist) {
+  const parts = String(artist ?? '')
+    .split(ARTIST_SEPARATORS)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length < 2) return [];
+  const names = [];
+  for (const part of parts) {
+    names.push(part);
+    const withoutThe = part.replace(/^the\s+/i, '');
+    if (withoutThe !== part && withoutThe) names.push(withoutThe);
+  }
+  return names;
+}
+
 /**
  * 매우 어려움 항목별 정답 후보. 곡에 없는 항목(가수 없음, 작품 없는 일반 노래)은 빠진다.
+ * 가수가 여러 명이면 그중 한 사람 이름만 맞혀도 인정한다(splitArtistNames).
  * @returns {Record<string, string[]>} EXTREME_ITEMS 순서
  */
 export function itemCandidates(song) {
   const lists = {
     title: [song.title, ...(song.titleAliases ?? [])],
-    artist: [song.artist, ...(song.artistAliases ?? [])],
+    artist: [song.artist, ...(song.artistAliases ?? []), ...splitArtistNames(song.artist)],
     anime: [song.anime?.name, ...(song.anime?.aliases ?? [])],
   };
   const result = {};

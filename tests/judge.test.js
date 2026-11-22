@@ -9,6 +9,7 @@ import {
   itemCandidates,
   judgeAnswer,
   judgeItems,
+  splitArtistNames,
   matchesCandidate,
   normalizeAnswer,
 } from '../js/judge.js';
@@ -132,4 +133,29 @@ test('매우 어려움 판정: 입력 하나를 남은 모든 항목과 비교',
   // 제목과 작품명이 같으면 한 번에 둘 다 맞힌다
   const same = makeSong(2, { title: 'Same Name', anime: { name: 'Same Name', aliases: [] }, artist: 'X Band' });
   assert.deepEqual(judgeItems('same name', same), { matched: ['title', 'anime'], already: [] });
+});
+
+test('가수 이름 나누기: ×·&·쉼표·feat.·with·" x "로 나누고, and·+는 이름의 일부로 둔다', () => {
+  assert.deepEqual(splitArtistNames('히이라기 마그네타이트×9Lana×Eye'), ['히이라기 마그네타이트', '9Lana', 'Eye']);
+  assert.deepEqual(splitArtistNames('키시다 교단 & THE 아케보시 로켓'), ['키시다 교단', 'THE 아케보시 로켓', '아케보시 로켓']);
+  assert.deepEqual(splitArtistNames('Aiobahn +81 feat. KOTOKO'), ['Aiobahn +81', 'KOTOKO']);
+  assert.deepEqual(splitArtistNames('CHiCO with HoneyWorks'), ['CHiCO', 'HoneyWorks']);
+  assert.deepEqual(splitArtistNames('스페셜 위크, 사일런스 스즈카, 토카이 테이오'), ['스페셜 위크', '사일런스 스즈카', '토카이 테이오']);
+  assert.deepEqual(splitArtistNames('A x B ft. C / D'), ['A', 'B', 'C', 'D']);
+  for (const single of ['HIGH and MIGHTY COLOR', 'YOASOBI', 'Linked Horizon', 'Official HIGE DANdism', 'Mrs. GREEN APPLE', '', null]) {
+    assert.deepEqual(splitArtistNames(single), [], String(single));
+  }
+});
+
+test('매우 어려움: 여러 명이 부른 곡은 한 명만 맞혀도 가수 정답', () => {
+  const song = makeSong(1, { artist: '스페셜 위크, 사일런스 스즈카, 토카이 테이오' });
+  assert.deepEqual(judgeItems('토카이 테이오', song).matched, ['artist']);
+  assert.deepEqual(judgeItems('사일런스스즈카', song).matched, ['artist']);
+  assert.deepEqual(judgeItems('스페셜 위크, 사일런스 스즈카, 토카이 테이오', song).matched, ['artist'], '전체 이름도 그대로 인정');
+  assert.deepEqual(judgeItems('다이와 스칼렛', song).matched, []);
+  const feat = makeSong(2, { artist: 'Aiobahn +81 feat. KOTOKO', artistAliases: ['코토코'] });
+  assert.deepEqual(judgeItems('Aiobahn', feat).matched, ['artist'], '+81을 빼고 써도 오타 허용 범위');
+  assert.deepEqual(judgeItems('kotoko', feat).matched, ['artist']);
+  const band = makeSong(3, { artist: 'HIGH and MIGHTY COLOR' });
+  assert.deepEqual(judgeItems('high', band).matched, [], 'and로 나누지 않는다');
 });
