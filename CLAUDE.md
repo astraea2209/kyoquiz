@@ -127,7 +127,7 @@
 - 미구현·미확인: 랜덤듣기·쉬움(객관식) 화면의 실제 브라우저 확인, 모바일 실기기·카카오톡 인앱 브라우저, 시작 신호 소리 시각 오차 측정, 백그라운드 탭 동작, 재접속 배너(`연결이 끊겼어요`) 실제 확인
 - 실제 브라우저·기기로 확인하지 못함: 시작 신호 소리 시각 오차(브라우저 2개 이상에서 infoDelivery로 측정 필요), 모바일 자동 진행
 - 서버 규칙 중 코드에서 정한 것(문서에 없던 세부): 오류 과반(절반 초과) 판정은 준비 단계에서만 곡 교체, 시작 신호 뒤 오류는 그 사람만 제외. ready 시간 초과로 아무도 준비하지 못해도 곡 교체. 대기실에서도 끊기면 60초 유예 뒤 퇴장(새로고침 대비). 결과 화면에서 새 입장 허용. 랜덤듣기는 `duration`이 없는 곡을 제외(songs.json 12곡은 `duration`이 채워져 있음). 시작 신호는 `go` 전송 3초 뒤. 전원 이탈 시 방은 유예(60초)가 끝나면 닫힘(`onClose`)
-- 매우 어려움 프로토콜(2026-11-22, 기존 메시지에 필드만 추가. 다른 난이도는 그대로): `prepare.items`(항목 키 배열, 아니면 null)·`prepare.attempts`(기회 수), 상태 스냅샷 플레이어 `solved`(맞힌 항목 개수, 매우 어려움 아니면 null), 항목을 맞히면 본인에게 `answerResult {correct: true, items, itemPoints, points(이번 획득, 보너스 포함), total, bonus, complete, elapsed, order}`(complete일 때만 `locked`), 이미 맞힌 항목만 내면 `answerResult {correct: false, already, attemptsLeft}`(기회 유지), `reveal`·`history`에 `items`와 `partialPlayers [{playerId, nickname, points, solved}]`, `correctPlayers` 항목에 `solved`, `reveal.song.artist`. 서버(`npm run server:deploy`)를 배포해야 공개 페이지에서 매우 어려움 방을 만들 수 있다(예전 서버는 `extreme` 설정을 bad-settings로 거부하고, 다른 난이도는 예전 서버와도 그대로 동작)
+- 매우 어려움 프로토콜(2026-11-22, 기존 메시지에 필드만 추가. 다른 난이도는 그대로): `prepare.items`(항목 키 배열, 아니면 null)·`prepare.attempts`(기회 수), 상태 스냅샷 플레이어 `solved`(맞힌 항목 개수, 매우 어려움 아니면 null), 항목을 맞히면 본인에게 `answerResult {correct: true, items, itemPoints, points(이번 획득, 보너스 포함), total, bonus, complete, elapsed, order}`(complete일 때만 `locked`), 이미 맞힌 항목만 내면 `answerResult {correct: false, already, attemptsLeft}`(기회 유지), `reveal`·`history`에 `items`와 `partialPlayers [{playerId, nickname, points, solved}]`, `correctPlayers` 항목에 `solved`, `reveal.song.artist`. 서버 배포함(2026-11-22, 버전 ea7a2a13). 배포 서버에 Node WebSocket으로 방 생성·입장 후 `extreme` 설정이 받아들여지고 state에 `solved`가 오는 것, 공개 페이지에 매우 어려움 선택지가 반영된 것 확인(공개 페이지에서 실제 대결은 안 해 봄)
 - 프로토콜: 클라이언트 `join/settings/start/ready/answer/pass/playerError/ping/leave`, 서버 `joined/state/prepare/go/locked/answerResult/rateLimited/reveal/gameOver/notice/error/pong/kicked`. 주의: 문서의 메시지 표에 없던 `joined`(토큰 전달), `answerResult`(본인에게만 오답 결과), `rateLimited`, `notice`, `pong`, `kicked`, `leave`를 추가했다. `reveal`에 `nextVideoId`가 있어 다음 곡을 cue한다. 정답 처리: 맞힌 사람에게만 `answerResult {correct: true, points, elapsed, order}`, 모두에게 `locked {reason: 'correct'}`, 상태 `correct`. `reveal`·`gameOver.history`는 `correctPlayers [{playerId, nickname, elapsed, points}]`(처리 순서)와 `reason: 'done'|'timeout'`을 싣는다(예전 `winnerId`·`winnerNickname`·`points`·`elapsed`와 `reason: 'correct'|'exhausted'`는 없어짐)
 
 ## 다음 작업 후보 (기획서 개발 단계)
@@ -136,7 +136,7 @@
 2. 난이도, 구간 길이, 별칭 매칭 다듬기. 매우 어려움: 최고 점수를 난이도별로 나눌지, 가중치·보너스·오답 기회 수 플레이 테스트
 3. 곡 등록 도구 보강: 점검 스크립트, 가수·가수 별칭, 작품명 선택화, 종류 확장 완료. 곡 찾기로 사용 끄기·삭제, 곡 길이 입력, 내 곡만 내보내기와 합치기 스크립트 완료. 남은 것: 등록한 곡 수정(지금은 같은 링크로 다시 추가해 교체), 점검 결과로 삭제·차단된 영상 정리(자동 비활성화 등), 정기 점검 방식
 4. 확장 모드(작품명 맞추기, 서바이벌, 타임어택)
-5. 친구와 대결 이어서(위 멀티 구현 현황 참고): 매우 어려움을 쓰려면 서버 배포(`npm run server:deploy`), 랜덤듣기·쉬움 확인 → 실기기 동기화 측정 → 배포는 main을 push하면 Pages가 자동 갱신, 서버는 `npm run server:deploy`
+5. 친구와 대결 이어서(위 멀티 구현 현황 참고): 랜덤듣기·쉬움 확인 → 실기기 동기화 측정 → 배포는 main을 push하면 Pages가 자동 갱신, 서버는 `npm run server:deploy`
 
 ## 미결정 사항
 
