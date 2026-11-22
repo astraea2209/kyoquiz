@@ -24,6 +24,27 @@
 - `songs.json`만 고치는 곡 데이터 작업, 점검, 기획 작업은 코드 작업과 동시에 해도 된다
 - 세션을 끝낼 때 이 파일의 검증 현황, 다음 작업 후보, 미결정 사항을 갱신하고 커밋한다
 
+## 곡 추가 절차
+
+모든 방문자와 친구와 대결에 나오게 하려면 `songs.json`에 넣는다. 곡 관리 화면에서 등록한 곡은 그 브라우저 localStorage에만 있다.
+
+1. 링크 정리: videoId만 뽑고(`si=` 같은 추적 파라미터는 버림), 같은 링크가 여러 번 있으면 한 번만, songs.json에 이미 있는 videoId는 건너뛴다
+2. 곡 정보 확인: 영상 제목·채널은 oEmbed(`https://www.youtube.com/oembed?url=<watch URL>&format=json`), 타이업(애니 OP·ED, 게임 주제가 등)은 watch 페이지 `shortDescription`에서 主題歌·テーマ·アニメ·ゲーム 같은 줄만 골라 본다. 검색 결과 HTML은 받지 않는다(토큰 절약). 스크립트는 셸 따옴표가 꼬이기 쉬우니 scratchpad에 `.mjs` 파일로 써서 실행
+3. 항목 작성. 필드 순서는 id, videoId, title, titleAliases, anime, artist, artistAliases, type, hookStart, skipStart, skipEnd, duration, enabled
+   - `id`: 작품 곡은 `bleach-op2`처럼 `작품-op번호`, 일반 노래는 `9lana-only-way`처럼 `가수-곡`(영문 소문자, 하이픈)
+   - `title`: 한국어 표기(일본어는 뜻을 옮기거나 음역, 예: ほうき星 → 혜성). 원제·로마자·영어·띄어쓰기 변형은 `titleAliases`. 영어 제목은 그대로 두고 한국어 읽기를 별칭에 넣는다
+   - `anime`: `{name: 한국어 작품명, aliases: [원제, 영어 제목, 시즌명 등]}`. 게임 곡은 `name`에 게임 이름. 작품이 없는 일반 노래는 필드 자체를 넣지 않는다
+   - `artist`: 한국어 표기가 있으면 한국어(예: 요네즈 켄시), 영문·원어 활동명은 그대로(예: YOASOBI, TK from 凛として時雨). 다른 표기는 `artistAliases`(예: 9Lana → 쿠라나)
+   - `type`: OP, ED, 삽입곡, OST(게임 주제가 포함), 캐릭터송, 일반곡, 기타
+   - 노래만 있는 영상이 아니면(예: 14분짜리 영상) `enabled: false`
+   - 공식 번역명을 확인하지 못한 작품명·곡 제목은 사용자에게 알린다(원제는 별칭에 있어 정답 인정에는 문제없음)
+4. 저장: 기존 줄은 그대로 두고 끝에 추가한다. 형식은 `formatSongsJson`(`tools/check-songs.mjs`)과 같게(곡마다 필드 한 줄, 배열과 `anime`는 한 줄). 스크립트로 넣을 때는 이 함수를 import해 쓴다
+5. 점검: `node tools/check-songs.mjs --write`(존재·임베드 가능 확인, `duration` 채움)와 `node --test`
+6. 반영: 커밋 → `main` push(GitHub Pages 자동 갱신, 1~2분) → `npm run server:deploy`(대결 서버는 songs.json을 배포 번들에 담으므로 다시 배포해야 대결에 새 곡이 나온다. 진행 중인 방은 사라짐). push와 배포는 사용자에게 먼저 묻는다. 확인은 `https://astraea2209.github.io/kyoquiz/songs.json`의 곡 수와 서버 `/api/health`
+7. 이 파일의 `songs.json` 곡 구성 설명과 검증 현황을 갱신한다
+
+친구가 "내 곡만 내보내기"로 보낸 파일은 3~4 대신 `node tools/merge-songs.mjs 친구.json --write`로 합치고 5부터 같다.
+
 ## 구조
 
 - `index.html`, `css/style.css`: 화면 4개(시작, 게임, 결과, 곡 관리)
@@ -37,7 +58,7 @@
 - `js/linkParser.js`: YouTube 링크에서 videoId와 `t=` 시작 시간 추출
 - `js/volume.js`: 노래 볼륨(0~100, 기본 80, localStorage `asq.volume`). `VolumeControl`이 개인전·친구와 대결 플레이어 모두에 `setVolume`을 적용하고, 슬라이더(시작 화면, 개인전 게임, 대기실, 대결 게임)는 `bindVolumeInput`으로 같은 값을 공유한다. `js/player.js`는 `unMute` 때 볼륨을 다시 적용한다
 - `js/songs.js`: 곡 스키마(애니송과 일반 노래 공용), songs.json과 localStorage 병합, 영상 길이 캐시, 최고 점수, 설정 저장. 곡 필드: id, videoId, title(유일한 필수값), titleAliases, anime{name, aliases}(선택, 일반 노래는 필드 자체가 없음), artist·artistAliases(선택, 표시·저장만 하고 정답 인정 안 함), type(`SONG_TYPES`: OP, ED, 삽입곡, OST, 캐릭터송, 일반곡, 기타. 비우면 작품이 있으면 OP, 없으면 일반곡), hookStart·skipStart·skipEnd·duration(선택, 초), enabled. 화면에서 `song.anime`은 없을 수 있으니 `?.`로 읽는다
-- `songs.json`: 기본 곡 목록(유명 애니 OP 12곡 + 블리치 OP·ED 15곡 + 9Lana(쿠라나) 13곡, 공식 채널 영상 위주. 9Lana 곡은 오리지널 10곡(`일반곡`, `anime` 없음), 애니 ED 2곡, 게임 주제가 1곡. 게임 곡은 `anime.name`에 게임 이름을 넣고 type `OST`. 블리치 ほうき星 영상은 14분짜리라 `enabled:false`). 제목은 한국어 표기, 원제·로마자·영어는 별칭. 가수는 한국어 표기가 있으면 한국어(예: 요네즈 켄시), 영문·원어 활동명은 그대로(예: YOASOBI, TK from 凛として時雨). `duration`은 점검 스크립트 `--write`로 채움(있으면 게임이 길이 측정용 음소거 로드를 건너뜀). `hookStart`는 아직 없음. `songs.sample.json`: 형식 예시(자리표시자 값)
+- `songs.json`: 기본 곡 목록(유명 애니 OP 12곡 + 블리치 OP·ED 15곡 + 9Lana(쿠라나) 13곡, 공식 채널 영상 위주. 9Lana 곡은 오리지널 10곡(`일반곡`, `anime` 없음), 애니 ED 2곡, 게임 주제가 1곡. 블리치 ほうき星 영상은 14분짜리라 `enabled:false`). 표기·필드 규칙은 위 "곡 추가 절차". `duration`은 점검 스크립트 `--write`로 채움(있으면 게임이 길이 측정용 음소거 로드를 건너뜀). `hookStart`는 아직 없음. `songs.sample.json`: 형식 예시(자리표시자 값)
 - `tools/check-songs.mjs`: songs.json 점검(oEmbed로 존재·임베드 가능 여부와 채널명, watch 페이지 `lengthSeconds`로 길이, duration 차이, id·videoId 중복). 순수 함수는 export해 `tests/checkSongs.test.js`에서 네트워크 없이 테스트. `formatSongsJson`은 `tools/merge-songs.mjs`도 쓴다
 - `tools/merge-songs.mjs`: 곡 JSON 합치기(`mergeSongLists`, `orderSongFields`, `diffFields`). 테스트는 `tests/mergeSongs.test.js`
 - `tests/`: 단위 테스트 파일 17개(가짜 플레이어·시계·타이머·소켓 포함)
