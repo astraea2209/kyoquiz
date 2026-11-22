@@ -415,7 +415,7 @@ export class GameSession {
       round.result.solved = round.items.filter((key) => round.solved.has(key));
       round.result.bonus = round.bonus;
     }
-    this.history.push({ song: round.song, ...round.result });
+    this.history.push({ song: round.song, segmentStart: round.segmentStart, ...round.result });
     const wasPlaying = this.phase !== PHASE.READY;
     this.phase = PHASE.REVEALED;
 

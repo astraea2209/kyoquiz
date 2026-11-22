@@ -18,6 +18,16 @@ export function isValidVideoId(id) {
 }
 
 /**
+ * 결과 화면에서 곡을 다시 들을 YouTube 주소. 시작 초가 있으면 그 위치부터(t=초). videoId가 이상하면 null.
+ * @example youtubeWatchUrl('dQw4w9WgXcQ', 42.7) → 'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s'
+ */
+export function youtubeWatchUrl(videoId, startSeconds = null) {
+  if (!isValidVideoId(videoId)) return null;
+  const t = Math.floor(Number(startSeconds));
+  return `https://www.youtube.com/watch?v=${videoId}${t > 0 ? `&t=${t}s` : ''}`;
+}
+
+/**
  * "45", "45s", "1m5s", "1h2m3s", "01:05" 형태의 시간 값을 초로 바꾼다.
  * 해석할 수 없으면 null.
  */

@@ -3,7 +3,7 @@
 import { GameSession, MODE, PHASE } from './game.js';
 import { handleGameKey } from './hotkeys.js';
 import { DIFFICULTY } from './judge.js';
-import { parseYouTubeLink } from './linkParser.js';
+import { parseYouTubeLink, youtubeWatchUrl } from './linkParser.js';
 import { SCORING, parseRounds } from './scoring.js';
 import { loadSettings, parseDurationText, saveSettings, searchSongs, splitAliases } from './songs.js';
 
@@ -45,6 +45,20 @@ function el(tag, props = {}, ...children) {
   }
   node.append(...children);
   return node;
+}
+
+/** 결과 목록의 곡 제목. 누르면 새 탭에서 YouTube로 들었던 구간부터 다시 듣는다 */
+function songLink(title, videoId, startSeconds) {
+  const href = youtubeWatchUrl(videoId, startSeconds);
+  if (!href) return title;
+  return el('a', {
+    class: 'song-link',
+    href,
+    target: '_blank',
+    rel: 'noopener noreferrer',
+    title: 'YouTube에서 다시 듣기(새 탭)',
+    text: title,
+  });
 }
 
 export class App {
@@ -492,7 +506,8 @@ export class App {
           {},
           el('span', { class: 'pts', text: `${h.points}점` }),
           el('span', { class: h.correct || partial ? 'ok' : 'bad', text: h.correct ? '○ ' : partial ? '△ ' : '× ' }),
-          [h.song.title, h.song.anime?.name ?? h.song.artist].filter(Boolean).join(' — '),
+          songLink(h.song.title, h.song.videoId, h.segmentStart),
+          ...[h.song.anime?.name ?? h.song.artist].filter(Boolean).map((name) => ` — ${name}`),
           ...(h.items ? [` (${h.solved.length}/${h.items.length})`] : []),
           ...(h.hintUsed ? [' (힌트)'] : []),
         );

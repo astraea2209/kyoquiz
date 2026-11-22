@@ -672,3 +672,14 @@ test('매우 어려움이 아니면 prepare.items는 null, 기회 3번', () => {
   assert.equal(env.prepare('a').attempts, 3);
   assert.equal(env.state().players[0].solved, null);
 });
+
+test('공개·결과 기록에 들었던 구간 시작(segmentStart)', () => {
+  const env = createEnv();
+  env.joinAll('a', 'b');
+  env.begin();
+  const start = env.round().segmentStart;
+  env.passRest();
+  assert.equal(env.last('a', 'reveal').segmentStart, start);
+  assert.equal(env.room.history[0].segmentStart, start);
+  assert.ok(start > 0);
+});

@@ -922,6 +922,7 @@ export class Room {
     const record = {
       roundIndex: this.roundIndex,
       videoId: song.videoId,
+      segmentStart: round.segmentStart, // 결과 화면에서 들었던 구간부터 다시 듣기
       title: song.title,
       animeName: song.anime?.name ?? null,
       reason,

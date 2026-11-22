@@ -10,6 +10,7 @@ import { ClockSync } from './net.js';
 import { OnlinePlayback, PLAYBACK_STAGE } from './playback.js';
 import { CHAT_LIMITS, OnlineSession } from './session.js';
 import { handleGameKey } from '../hotkeys.js';
+import { youtubeWatchUrl } from '../linkParser.js';
 import { bindVolumeInput } from '../volume.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -68,6 +69,13 @@ function el(tag, props = {}, ...children) {
   }
   node.append(...children);
   return node;
+}
+
+/** 결과 기록의 곡 제목. 누르면 새 탭에서 YouTube로 들었던 구간부터 다시 듣는다 */
+function songLink(title, videoId, startSeconds) {
+  const href = youtubeWatchUrl(videoId, startSeconds);
+  if (!href) return title;
+  return el('a', { class: 'song-link', href, target: '_blank', rel: 'noopener noreferrer', title: 'YouTube에서 다시 듣기(새 탭)', text: title });
 }
 
 function safe(fn, fallback = null) {
@@ -858,6 +866,7 @@ export class OnlineApp {
       el('ol', { id: 'on-ranking', class: 'ranking' }),
       el('div', { class: 'chat-slot' }),
       el('h2', { text: '라운드별 기록' }),
+      el('p', { class: 'hint', text: '곡 제목을 누르면 YouTube에서 들었던 구간부터 다시 들을 수 있어요.' }),
       el('ol', { id: 'on-history', class: 'result-list' }),
       el(
         'div',
@@ -901,7 +910,8 @@ export class OnlineApp {
           {},
           el('span', { class: 'pts', text: mine ? `+${mine.points}점` : '' }),
           el('span', { class: corrects.length || partials.length ? 'ok' : 'bad', text: mark }),
-          `${h.title} — ${names.length ? names.join(', ') : '정답자 없음'}`,
+          songLink(h.title, h.videoId, h.segmentStart),
+          ` — ${names.length ? names.join(', ') : '정답자 없음'}`,
         );
       }),
     );

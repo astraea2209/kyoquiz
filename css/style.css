@@ -259,6 +259,9 @@ textarea { min-height: 100px; margin: 8px 0; }
 .result-list .pts { float: right; font-weight: 700; }
 .result-list .ok { color: var(--ok); }
 .result-list .bad { color: var(--bad); }
+.song-link { color: var(--text); text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+.song-link::after { content: ' ↗'; color: var(--muted); font-size: 0.85em; }
+.song-link:hover { color: var(--accent); }
 .new-record { color: var(--warn); font-weight: 700; }
 
 /* 곡 관리 */

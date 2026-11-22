@@ -61,3 +61,13 @@ test('잘못된 입력', () => {
   assert.equal(parseYouTubeLink('not a url at all'), null);
   assert.equal(isValidVideoId('VIDEO_ID_1'), false);
 });
+
+test('youtubeWatchUrl: 다시 듣기 주소, 시작 초는 내림, 0이나 없으면 생략', async () => {
+  const { youtubeWatchUrl } = await import('../js/linkParser.js');
+  assert.equal(youtubeWatchUrl(ID), `https://www.youtube.com/watch?v=${ID}`);
+  assert.equal(youtubeWatchUrl(ID, 42.7), `https://www.youtube.com/watch?v=${ID}&t=42s`);
+  assert.equal(youtubeWatchUrl(ID, 0), `https://www.youtube.com/watch?v=${ID}`);
+  assert.equal(youtubeWatchUrl(ID, null), `https://www.youtube.com/watch?v=${ID}`);
+  assert.equal(youtubeWatchUrl('bad id'), null);
+  assert.equal(youtubeWatchUrl('javascript:alert(1)'), null);
+});

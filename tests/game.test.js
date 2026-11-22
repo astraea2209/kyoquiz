@@ -524,3 +524,13 @@ test('라운드 수 직접 지정(7)과 15초 구간', () => {
   game.submitAnswer(game.round.song.title);
   assert.equal(game.round.result.points, 50);
 });
+
+test('결과 기록에 videoId와 들었던 구간 시작(segmentStart)이 남는다(다시 듣기 링크용)', () => {
+  const { game } = setup();
+  game.start();
+  beginAudio(game);
+  const start = game.round.segmentStart;
+  game.pass();
+  assert.equal(game.history[0].song.videoId, game.round.song.videoId);
+  assert.equal(game.history[0].segmentStart, start);
+});
