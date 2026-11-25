@@ -3116,5 +3116,52 @@
     "type": "ED",
     "duration": 90,
     "enabled": true
+  },
+  {
+    "id": "kanojo-op1",
+    "videoId": "lvbumK8M75E",
+    "title": "논시나리오 에튀드",
+    "anime": { "name": "여친, 빌리겠습니다" },
+    "artist": "아마미야 소라",
+    "type": "OP",
+    "enabled": true
+  },
+  {
+    "id": "kanojo-ed1",
+    "videoId": "p-iOFxtEUq0",
+    "title": "204호실",
+    "anime": { "name": "여친, 빌리겠습니다" },
+    "artist": "나키고토",
+    "type": "ED",
+    "enabled": true
+  },
+  {
+    "id": "kanojo-op2",
+    "videoId": "VOdmjxK8QGQ",
+    "title": "우미츠키",
+    "titleAliases": ["Umitsuki"],
+    "anime": { "name": "여친, 빌리겠습니다" },
+    "artist": "ClariS",
+    "type": "OP",
+    "enabled": true
+  },
+  {
+    "id": "kanojo-ed2",
+    "videoId": "4G_FxiIALwo",
+    "title": "나의 베가",
+    "anime": { "name": "여친, 빌리겠습니다" },
+    "artist": "리갈 릴리",
+    "type": "ED",
+    "enabled": true
+  },
+  {
+    "id": "kanojo-ed3",
+    "videoId": "SHD0VM-auPc",
+    "title": "엔딩 크레딧",
+    "anime": { "name": "여친, 빌리겠습니다" },
+    "artist": "Amber's",
+    "artistAliases": ["앰버즈"],
+    "type": "ED",
+    "enabled": true
   }
 ]
