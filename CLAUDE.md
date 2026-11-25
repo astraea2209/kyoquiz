@@ -56,8 +56,8 @@
 - `js/ui.js`: App 클래스. 화면 전환과 DOM 처리
 - `js/game.js`: GameSession 상태 머신(라운드 진행, 재생 오류 시 곡 교체, 곡 부족 시 라운드 축소)
 - `js/player.js`: YouTube IFrame API 로드와 플레이어 래퍼
-- `js/judge.js`: 정답 정규화, 오타 허용, 난이도별 인정 범위, 객관식 보기 생성. `initialHint`(초성 힌트: 한글 음절은 초성, 영문 등은 단어 첫 글자만 남기고 `_`, 띄어쓰기·숫자·기호는 그대로), `revealsAnswer`(채팅 글에 정답이 들어 있는지: 제목·가수·작품명과 별칭 전부와 오타 허용 비교, 또는 2글자 이상 후보가 글 안에 그대로 들어 있음). 매우 어려움용 `itemCandidates`(곡에 있는 항목만: title·artist·anime)와 `judgeItems`(입력 하나를 남은 항목 전부와 비교), `splitArtistNames`(여러 명이 부른 곡의 가수 표기를 ×·&·쉼표·、·/·` x `·feat.·ft.·featuring·with로 나누고 앞의 THE를 뺀 이름도 추가. and와 +는 이름의 일부라 나누지 않음)
-- `js/scoring.js`: 점수 상수와 계산. 밸런스 조정은 이 파일의 `SCORING`만 바꾼다. 초성 힌트는 `SCORING.hint.scoreFactor`(0.5)와 `applyHint`. 매우 어려움은 `SCORING.extreme`(항목 가중치 제목 2·가수 1·작품명 1, 완주 보너스 0.5, 오답 기회 5)과 `scoreExtremeItem`, `scoreExtremeBonus`. 멀티용은 `SCORING.multi`(속도 보너스 +50%, 답변 시간 10/15/20초, 인원 2~8)와 `scoreMulti`, `answerWindow`
+- `js/judge.js`: 정답 정규화, 오타 허용, 난이도별 인정 범위, 객관식 보기 생성. `initialHint`(초성 힌트: 한글 음절은 초성, 영문 등은 단어 첫 글자만 남기고 `_`, 띄어쓰기·숫자·기호는 그대로), `hintParts`(힌트 항목 [{key, text}]: 매우 어려움은 곡에 있는 제목·가수·작품명, 그 밖에는 제목)·`formatHint`(화면 문구), `revealsAnswer`(채팅 글에 정답이 들어 있는지: 제목·가수·작품명과 별칭 전부와 오타 허용 비교, 또는 2글자 이상 후보가 글 안에 그대로 들어 있음). 매우 어려움용 `itemCandidates`(곡에 있는 항목만: title·artist·anime)와 `judgeItems`(입력 하나를 남은 항목 전부와 비교), `splitArtistNames`(여러 명이 부른 곡의 가수 표기를 ×·&·쉼표·、·/·` x `·feat.·ft.·featuring·with로 나누고 앞의 THE를 뺀 이름도 추가. and와 +는 이름의 일부라 나누지 않음)
+- `js/scoring.js`: 점수 상수와 계산. 밸런스 조정은 이 파일의 `SCORING`만 바꾼다. 초성 힌트는 `SCORING.hint.scoreFactor`(0.5)와 `applyHint`. 개인전 랜덤듣기 답변 시간은 `SCORING.solo.answerTimes`(0=제한 없음 기본, 10/15/20). 매우 어려움은 `SCORING.extreme`(항목 가중치 제목 2·가수 1·작품명 1, 완주 보너스 0.5, 오답 기회 5)과 `scoreExtremeItem`, `scoreExtremeBonus`. 멀티용은 `SCORING.multi`(속도 보너스 +50%, 답변 시간 10/15/20초, 인원 2~8)와 `scoreMulti`, `answerWindow`
 - `js/segment.js`: 랜덤듣기 구간 선택(앞뒤 10% 제외, hookStart ±5초 우선)
 - `js/linkParser.js`: YouTube 링크에서 videoId와 `t=` 시작 시간 추출. `youtubeWatchUrl(videoId, 시작 초)`: 결과 화면 다시 듣기 주소
 - `js/hotkeys.js`: 게임 화면 단축키(개인전·친구와 대결 공용, 순수 함수). K = 패스(`event.code === 'KeyK'`라 한글 자판 ㅏ도 됨, 글자 입력칸에 포커스가 있으면 동작 안 함), Esc = 입력칸 빠져나오기. 소리가 나면 답 입력칸에 자동 포커스되므로 입력 중에는 Esc → K(사용자 결정, 2026-11-22). 패스 버튼 문구 `패스 (K)`
@@ -81,14 +81,15 @@
 
 ## 게임 규칙 (기획서 기준)
 
-- 모드: 랜덤듣기(3/5/10/15초 구간, 다시듣기 1회), 전체듣기(처음부터, 제한시간 30초). 라운드 수는 빠른 선택 5/10/20 또는 직접 입력 1~100(`SCORING.roundLimits`, `parseRounds`가 범위 밖 값을 끝값으로 고침, 곡이 모자라면 곡 수만큼). 개인전·대결 모두 같은 규칙(서버는 `isValidRounds`로 검증). 플레이 중 모드 변경 불가
+- 모드: 랜덤듣기(3/5/10/15초 구간, 다시듣기 1회. 개인전은 구간이 끝난 뒤 답변 시간을 제한 없음/10/15/20초 중 고름(2026-11-25), 시간이 지나면 시간 초과로 공개. 다시듣기 하면 다시 들은 구간이 끝난 뒤부터 새로 셈. 대결은 대기실 답변 시간 10/15/20초), 전체듣기(처음부터, 제한시간 30초). 라운드 수는 빠른 선택 5/10/20 또는 직접 입력 1~100(`SCORING.roundLimits`, `parseRounds`가 범위 밖 값을 끝값으로 고침, 곡이 모자라면 곡 수만큼). 개인전·대결 모두 같은 규칙(서버는 `isValidRounds`로 검증). 플레이 중 모드 변경 불가
 - 난이도: 쉬움(객관식 4지선다), 보통(주관식, 제목 또는 작품명), 어려움(주관식, 제목만), 매우 어려움(아래, 개인전·친구와 대결 모두)
 - 매우 어려움: 제목·가수·작품명(곡에 있는 항목만. 작품 없는 일반 노래는 제목·가수 2개)을 모두 맞혀야 라운드가 끝난다. 입력칸은 하나이고 입력을 남은 항목 전부와 비교해 맞은 항목을 모두 인정한다. 가수가 여러 명이면 그중 한 명만 맞혀도 가수 정답(사용자 결정, 2026-11-22. 전체 표기와 가수 별칭도 그대로 인정). 항목마다 맞힌 즉시 점수: 그 시점의 라운드 기본 점수(랜덤듣기 구간·다시듣기, 전체듣기 경과 시간)를 가중치 제목 2 : 가수 1 : 작품명 1로 나눈 값. 전부 맞히면 기본 점수의 50% 보너스. 오답 기회 5번, 이미 맞힌 항목을 다시 입력하면 기회가 줄지 않는다. 패스·기회 소진·시간 초과여도 맞힌 항목 점수는 남는다. 결과 목록은 전부 ○, 일부 △, 없음 ×. 최고 점수는 지금처럼 모드별 기록(난이도 구분 없음)이라 매우 어려움 점수(라운드 최대 기본 점수의 1.5배)가 섞인다
+- 친구와 대결 표시(2026-11-25): 정답 공개 10초(`ROOM_CONFIG.revealMs`, 예전 8초) 뒤 다음 라운드. 플레이어 색 `playerColor`(`js/online/session.js`, 입장 순서 p1~p8에 8색)를 채팅 이름·참가자 목록·순위판 이름에 쓴다. 순위판 상태 칩 색: 정답 초록, 패스 회색(문구 '포기' → '패스'), 기회 소진 빨강, 힌트 주황, 매우 어려움 진행(1/3) 파랑, 재생 오류·준비 지연·쉬는 중·연결 끊김은 점선 테두리
 - 친구와 대결의 매우 어려움: 항목 점수의 기본 점수는 각자 맞힌 시점의 속도 점수(`scoreMulti`). 전부 맞혀야 '정답'으로 잠기고 정답 수에 들어간다. 일부만 맞힌 사람도 공개 때 그 점수를 받는다(정답 수에는 안 들어감). 다른 사람에게는 맞힌 항목 개수만 보인다(순위판 칩 `1/3`). 공개 문구는 `손님 2/2 +181점(12.5초), 나 1/2 +79점`, 결과 기록은 전부 ○, 일부만 △
 - 오답 기회는 라운드당 3번(매우 어려움은 5번), 소진하면 정답 공개 후 0점. 패스도 0점
 - 오타 허용: 정규화 길이 4 이하 완전 일치, 5~8은 편집거리 1 이하, 9 이상은 2 이하. 한글, 일본어, 영어 표기 차이는 자동 변환하지 않고 별칭으로 처리
 - 점수: 랜덤듣기는 100 × 구간 계수(3초 1.5, 5초 1.0, 10초 0.7, 15초 0.5) − 다시듣기 20점(정답이면 최소 10점). 전체듣기는 100에서 시작해 30초 동안 20점까지 선형 감소
-- 초성 힌트(2026-11-22, 개인전·친구와 대결): 쉬움 제외, 소리가 난 뒤(대결은 시작 신호 뒤) 라운드당 1번 "초성 힌트 (-50%)" 버튼으로 곡 제목 초성을 본다. 이후 얻는 점수는 절반(개인전은 `currentBase`, 대결은 `Room.speedScore`에서 적용). 매우 어려움은 힌트 전에 맞힌 항목은 그대로, 힌트 뒤 항목·보너스만 절반. 대결에서는 초성이 본인에게만 가고, 다른 사람에게는 순위판 칩 `힌트`만 보인다. 공개 문구·결과 기록에 힌트 사용 표시
+- 초성 힌트(2026-11-22, 개인전·친구와 대결): 쉬움 제외, 소리가 난 뒤(대결은 시작 신호 뒤) 라운드당 1번 "초성 힌트 (-50%)" 버튼으로 곡 제목 초성을 본다(매우 어려움은 가수·작품명 초성도, 2026-11-25). 이후 얻는 점수는 절반(개인전은 `currentBase`, 대결은 `Room.speedScore`에서 적용). 매우 어려움은 힌트 전에 맞힌 항목은 그대로, 힌트 뒤 항목·보너스만 절반. 대결에서는 초성이 본인에게만 가고, 다른 사람에게는 순위판 칩 `힌트`만 보인다. 공개 문구·결과 기록에 힌트 사용 표시
 - 결과 화면 다시 듣기(2026-11-22): 개인전 결과 목록과 대결 라운드별 기록의 곡 제목이 링크(새 탭, YouTube watch 주소에 `t=` 들었던 구간 시작 초). 개인전 `history` 항목과 대결 `reveal`·`history` 기록에 `segmentStart`
 - 콤보는 없다. 모드별 최고 점수는 끝까지 마친 게임만 localStorage에 기록
 
@@ -107,7 +108,7 @@
 
 ## 검증 현황
 
-- 확인함: 단위 테스트 261개 통과(개인전·곡 점검·볼륨·곡 합치기·매우 어려움·15초·라운드 입력·가수 나누기·단축키·초성 힌트·다시 듣기 링크 112개 + 멀티(채팅·힌트 포함) 149개), 모든 JS 파일 `node --check` 통과, 가짜 YT 객체를 넣은 헤드리스 Chrome에서 곡 추가부터 결과 화면까지의 흐름, 실제 브라우저에서 YouTube 재생과 소리·영상(사용자 확인), songs.json 12곡 모두 localhost에서 임베드 재생 오류 없음(2026-11-15), `tools/check-songs.mjs`로 12곡 모두 정상(oEmbed 200, duration 채움, 2026-11-15), 9Lana 13곡 추가 후 40곡 모두 정상(2026-11-16), 2026 애니 12곡 추가 후 52곡, 최애의 아이·프리렌·식령제로 12곡 추가 후 64곡, 친구 곡 24곡 추가 후 88곡, 11곡 추가 후 99곡, 57곡 추가 후 156곡 모두 정상·duration 채움(2026-11-22, oEmbed·점검 스크립트만. 실제 임베드 재생은 확인 안 함)
+- 확인함: 단위 테스트 267개 통과(개인전·곡 점검·볼륨·곡 합치기·매우 어려움·15초·라운드 입력·가수 나누기·단축키·초성 힌트·다시 듣기 링크·답변 시간 116개 + 멀티(채팅·힌트·플레이어 색 포함) 151개), 모든 JS 파일 `node --check` 통과, 가짜 YT 객체를 넣은 헤드리스 Chrome에서 곡 추가부터 결과 화면까지의 흐름, 실제 브라우저에서 YouTube 재생과 소리·영상(사용자 확인), songs.json 12곡 모두 localhost에서 임베드 재생 오류 없음(2026-11-15), `tools/check-songs.mjs`로 12곡 모두 정상(oEmbed 200, duration 채움, 2026-11-15), 9Lana 13곡 추가 후 40곡 모두 정상(2026-11-16), 2026 애니 12곡 추가 후 52곡, 최애의 아이·프리렌·식령제로 12곡 추가 후 64곡, 친구 곡 24곡 추가 후 88곡, 11곡 추가 후 99곡, 57곡 추가 후 156곡 모두 정상·duration 채움(2026-11-22, oEmbed·점검 스크립트만. 실제 임베드 재생은 확인 안 함)
 - 실제 YouTube로 확인함(데스크톱 Chromium, 2026-11-15):
   - 0초 소리 누출 없음. iframe의 infoDelivery 메시지로 기록해 보니, 길이를 모르는 5곡 모두 0초 부근에서는 음소거였고 unMute는 구간 시작 위치에서만 일어났다. 3초 구간은 약 3.1초 재생
   - 오버레이는 공개 전까지 무대 전체를 가리고, 공개 때만 현재 플레이어가 보인다. controls=0이라 공개 중에도 제목 표시줄은 안 보임
@@ -135,7 +136,8 @@
 - 초성 힌트(2026-11-22, 브랜치 claude/initial-hint, 로컬 Chromium + `wrangler dev`): 개인전 랜덤듣기 15초에서 힌트 → `제목 초성: ㅊㅊㄹㄹㅈ`, 입력칸 포커스 유지, 정답 +25점(50의 절반)·"힌트 사용" 표시. 대결 전체듣기에서 방장만 힌트 → 손님 화면에는 초성 없이 순위판 `힌트` 칩, 9.7초 정답 +37점(74의 절반), 공개 문구 `방장 +37점(9.7초, 힌트)`. 375px 폭에서 버튼 3개(다시듣기·힌트·패스)가 한 줄 글자로 들어가게 좁은 화면 버튼 여백을 줄임
 - 결과 다시 듣기 링크(2026-11-22, 로컬 Chromium + `wrangler dev`): 개인전 5라운드 결과 목록 제목 5개가 `watch?v=…&t=41s`처럼 구간 시작 초를 단 새 탭 링크, 대결 1라운드 결과(탭 2개 모두) 라운드별 기록 제목 링크 확인. 링크를 실제로 눌러 YouTube가 그 위치부터 재생되는지는 안 봄
 - 초성 힌트·다시 듣기 배포함(2026-11-22, main push + 서버 버전 4d83ebd2): 배포 서버에 Node WebSocket 2개로 1라운드 진행, 힌트 요청한 사람에게만 `hint {text: 'A___ t___'}`, 상대 state에는 `hint: true`만, `reveal.segmentStart` 옴. 공개 페이지에서 실제 대결은 안 해 봄
-- 힌트 프로토콜: 클라이언트 `hint {roundId}`, 서버 → 본인 `hint {roundId, text}`, 상태 스냅샷 플레이어 `hint`(이번 라운드 사용 여부, 게임 밖이면 null), `reveal`·`history`의 `correctPlayers`·`partialPlayers` 항목에 `hint`
+- 피드백 5가지(2026-11-25, 브랜치 claude/feedback-batch, 로컬 Chromium + `wrangler dev`, main push·서버 배포 안 함(사용자 요청)): 개인전 랜덤듣기 3초·답변 시간 10초·매우 어려움에서 힌트 `초성 — 제목 S____ D___ · 가수 ㅁㅈ · 작품명 ㄹㅂㄹㅇㅂ`, 구간이 끝나자 `구간 3초 · 남은 시간 10초` → 7초, 10초 뒤 `0/3 맞힘 — +0점 (시간 초과)`, 새로고침 뒤 답변 시간 10초 복원. 대결 2탭: 참가자·채팅 이름 색이 사람마다 다름, 순위판 `힌트`(st-hint)·`기회 소진`(st-exhausted)·`정답`(st-correct)·`패스`(st-passed) 칩, 정답 공개 뒤 다음 라운드 준비까지 10.0초. 같이 고친 것: 시작 화면 모드 카드의 숨긴 라디오 버튼이 화면 폭만큼 늘어나 가로 스크롤이 생기던 문제(`.mode-card`에 position relative). 대결 매우 어려움 힌트 화면은 단위 테스트로만 확인
+- 힌트 프로토콜: 클라이언트 `hint {roundId}`, 서버 → 본인 `hint {roundId, text(제목 초성), parts [{key, text}](매우 어려움은 제목·가수·작품명)}`, 상태 스냅샷 플레이어 `hint`(이번 라운드 사용 여부, 게임 밖이면 null), `reveal`·`history`의 `correctPlayers`·`partialPlayers` 항목에 `hint`
 - 채팅 프로토콜: 클라이언트 `chat {text}`(100자, 공백 정리), 서버 → 모두 `chat {id, playerId, nickname, text, at}`, 입장·재접속한 연결에 `chatLog {messages}`(최근 50개, `ROOM_CONFIG.chatLogSize`), 보낸 사람에게만 `chatBlocked {reason: 'answer'|'rate'}`(준비·시작 대기·답변 단계에서 `revealsAnswer`면 answer, 0.5초 안에 다시 보내면 rate). 막힌 채팅은 쿨다운에 넣지 않는다
 - 매우 어려움 프로토콜(2026-11-22, 기존 메시지에 필드만 추가. 다른 난이도는 그대로): `prepare.items`(항목 키 배열, 아니면 null)·`prepare.attempts`(기회 수), 상태 스냅샷 플레이어 `solved`(맞힌 항목 개수, 매우 어려움 아니면 null), 항목을 맞히면 본인에게 `answerResult {correct: true, items, itemPoints, points(이번 획득, 보너스 포함), total, bonus, complete, elapsed, order}`(complete일 때만 `locked`), 이미 맞힌 항목만 내면 `answerResult {correct: false, already, attemptsLeft}`(기회 유지), `reveal`·`history`에 `items`와 `partialPlayers [{playerId, nickname, points, solved}]`, `correctPlayers` 항목에 `solved`, `reveal.song.artist`. 서버 배포함(2026-11-22, 버전 ea7a2a13). 배포 서버에 Node WebSocket으로 방 생성·입장 후 `extreme` 설정이 받아들여지고 state에 `solved`가 오는 것, 공개 페이지에 매우 어려움 선택지가 반영된 것 확인(공개 페이지에서 실제 대결은 안 해 봄)
 - 프로토콜: 클라이언트 `join/settings/start/ready/answer/pass/hint/playerError/chat/ping/leave`, 서버 `joined/state/prepare/go/locked/answerResult/rateLimited/reveal/gameOver/notice/error/pong/kicked/hint/chat/chatLog/chatBlocked`. 주의: 문서의 메시지 표에 없던 `joined`(토큰 전달), `answerResult`(본인에게만 오답 결과), `rateLimited`, `notice`, `pong`, `kicked`, `leave`를 추가했다. `reveal`에 `nextVideoId`가 있어 다음 곡을 cue한다. 정답 처리: 맞힌 사람에게만 `answerResult {correct: true, points, elapsed, order}`, 모두에게 `locked {reason: 'correct'}`, 상태 `correct`. `reveal`·`gameOver.history`는 `correctPlayers [{playerId, nickname, elapsed, points}]`(처리 순서)와 `reason: 'done'|'timeout'`을 싣는다(예전 `winnerId`·`winnerNickname`·`points`·`elapsed`와 `reason: 'correct'|'exhausted'`는 없어짐)
@@ -146,7 +148,7 @@
 2. 난이도, 구간 길이, 별칭 매칭 다듬기. 매우 어려움: 최고 점수를 난이도별로 나눌지, 가중치·보너스·오답 기회 수 플레이 테스트
 3. 곡 등록 도구 보강: 점검 스크립트, 가수·가수 별칭, 작품명 선택화, 종류 확장 완료. 곡 찾기로 사용 끄기·삭제, 곡 길이 입력, 내 곡만 내보내기와 합치기 스크립트 완료. 남은 것: 등록한 곡 수정(지금은 같은 링크로 다시 추가해 교체), 점검 결과로 삭제·차단된 영상 정리(자동 비활성화 등), 정기 점검 방식
 4. 확장 모드(작품명 맞추기, 서바이벌, 타임어택)
-5. 친구와 대결 이어서(위 멀티 구현 현황 참고): 공개 페이지에서 채팅 실제 확인, 랜덤듣기·쉬움 확인 → 실기기 동기화 측정 → 배포는 main을 push하면 Pages가 자동 갱신, 서버는 `npm run server:deploy`
+5. 친구와 대결 이어서(위 멀티 구현 현황 참고): claude/feedback-batch 브랜치(힌트 parts, 공개 10초) main 병합·push와 서버 배포(사용자가 아직 하지 말라고 함, 2026-11-25), 공개 페이지에서 채팅 실제 확인, 랜덤듣기·쉬움 확인 → 실기기 동기화 측정 → 배포는 main을 push하면 Pages가 자동 갱신, 서버는 `npm run server:deploy`
 
 ## 미결정 사항
 

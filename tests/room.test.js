@@ -146,7 +146,7 @@ test('재접속 토큰: 점수를 유지하고 진행 중인 라운드는 쉬고
   assert.equal(env.state().players[0].score, aScore);
   assert.equal(env.msgs('b2', 'prepare').length, 0, '진행 중인 라운드에는 끼지 않는다');
 
-  env.timers.advance(8000); // 공개 → 다음 라운드 준비
+  env.timers.advance(env.room.config.revealMs); // 공개 → 다음 라운드 준비
   assert.equal(env.msgs('b2', 'prepare').length, 1);
   assert.equal(env.state().players[1].status, 'preparing');
 });
@@ -243,7 +243,7 @@ test('남은 사람이 1명이면 현재 라운드를 마치고 결과 화면', 
   env.answer('a', env.correctText());
   assert.equal(env.state().phase, ROOM_PHASE.REVEALED);
   assert.equal(env.last('a', 'reveal').hasNext, false);
-  env.timers.advance(8000);
+  env.timers.advance(env.room.config.revealMs);
   assert.equal(env.state().phase, ROOM_PHASE.RESULTS);
   assert.equal(env.last('a', 'gameOver').reason, 'not-enough-players');
 });
@@ -270,7 +270,7 @@ test('끝까지 진행: 순위·라운드별 기록, 방장이 같은 멤버로 
     env.timers.advance(3000 + 2000);
     env.answer(w, env.correctText());
     env.passRest();
-    env.timers.advance(8000);
+    env.timers.advance(env.room.config.revealMs);
   }
   assert.equal(env.state().phase, ROOM_PHASE.RESULTS);
   const over = env.last('b', 'gameOver');
@@ -304,7 +304,7 @@ test('다시 시작 전에 나간 사람은 정리된다', () => {
     }
     env.answer('a', env.correctText());
     env.passRest();
-    env.timers.advance(8000);
+    env.timers.advance(env.room.config.revealMs);
   }
   assert.equal(env.state().phase, ROOM_PHASE.RESULTS);
   assert.equal(env.last('a', 'gameOver').ranking.find((r) => r.nickname === 'c').left, true);

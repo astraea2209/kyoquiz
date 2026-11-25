@@ -158,6 +158,25 @@ export function initialHint(text) {
   return out;
 }
 
+/**
+ * 라운드 힌트 항목. 매우 어려움은 곡에 있는 항목(제목·가수·작품명) 모두, 그 밖의 난이도는 제목만.
+ * @returns {{key: string, text: string}[]}
+ */
+export function hintParts(song, difficulty) {
+  if (difficulty !== DIFFICULTY.EXTREME) return [{ key: 'title', text: initialHint(song.title) }];
+  const names = { title: song.title, artist: song.artist, anime: song.anime?.name };
+  return Object.keys(itemCandidates(song)).map((key) => ({ key, text: initialHint(names[key]) }));
+}
+
+const HINT_LABEL = { title: '제목', artist: '가수', anime: '작품명' };
+
+/** 화면에 보일 힌트 문구. @example '제목 초성: ㅅㅇㅎㅌ', '초성 — 제목 ㅅㅇㅎㅌ · 가수 ㅇㄴㅈ ㅋㅅ' */
+export function formatHint(parts) {
+  if (!parts?.length) return '';
+  if (parts.length === 1) return `${HINT_LABEL[parts[0].key] ?? ''} 초성: ${parts[0].text}`;
+  return `초성 — ${parts.map((p) => `${HINT_LABEL[p.key] ?? p.key} ${p.text}`).join(' · ')}`;
+}
+
 /** 주관식 판정 */
 export function judgeAnswer(input, song, difficulty) {
   for (const candidate of answerCandidates(song, difficulty)) {

@@ -179,3 +179,12 @@ test('세션 chatBlocked: 이유를 기록하고 다음 전송 때 지운다', (
   env.session.sendChat('다른 말');
   assert.equal(env.session.chatBlocked, null);
 });
+
+test('playerColor: 입장 순서마다 다른 색(최대 8명 모두 다름), 모르는 형식은 첫 색', async () => {
+  const { playerColor, PLAYER_COLORS } = await import('../js/online/session.js');
+  const colors = Array.from({ length: 8 }, (_, i) => playerColor(`p${i + 1}`));
+  assert.equal(new Set(colors).size, 8);
+  assert.equal(playerColor('p1'), PLAYER_COLORS[0]);
+  assert.equal(playerColor('p9'), PLAYER_COLORS[0], '9번째부터는 다시 처음 색');
+  assert.equal(playerColor(null), PLAYER_COLORS[0]);
+});

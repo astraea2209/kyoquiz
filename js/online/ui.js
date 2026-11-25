@@ -2,13 +2,13 @@
 // 화면 전환은 기존 App.showScreen을 그대로 쓴다(data-screen 이름: online-entry/lobby/game/result).
 
 import { MODE } from '../game.js';
-import { DIFFICULTY } from '../judge.js';
+import { DIFFICULTY, formatHint } from '../judge.js';
 import { SCORING, parseRounds } from '../scoring.js';
 import { RoomConnection } from './connection.js';
 import { buildInviteLink, resolveServerUrl, roomsUrl, webSocketUrl } from './config.js';
 import { ClockSync } from './net.js';
 import { OnlinePlayback, PLAYBACK_STAGE } from './playback.js';
-import { CHAT_LIMITS, OnlineSession } from './session.js';
+import { CHAT_LIMITS, OnlineSession, playerColor } from './session.js';
 import { handleGameKey } from '../hotkeys.js';
 import { youtubeWatchUrl } from '../linkParser.js';
 import { bindVolumeInput } from '../volume.js';
@@ -27,11 +27,20 @@ const ITEM_LABEL = { title: '제목', artist: '가수', anime: '작품명' };
 const itemNames = (keys) => keys.map((key) => ITEM_LABEL[key]).join(', ');
 const STATUS_CHIP = {
   correct: '정답',
-  passed: '포기',
+  passed: '패스',
   exhausted: '기회 소진',
   error: '재생 오류',
   timeout: '준비 지연',
   absent: '쉬는 중',
+};
+// 순위판 상태 칩 색(css .chip.st-*)
+const STATUS_CLASS = {
+  correct: 'st-correct',
+  passed: 'st-passed',
+  exhausted: 'st-exhausted',
+  error: 'st-off',
+  timeout: 'st-off',
+  absent: 'st-off',
 };
 const REASON_TEXT = {
   timeout: '시간 초과 — 아무도 맞히지 못했어요',
@@ -420,7 +429,7 @@ export class OnlineApp {
           el(
             'li',
             { class: m.playerId === s.you ? 'me' : '' },
-            el('span', { class: 'chat-name', text: m.nickname }),
+            el('span', { class: 'chat-name', text: m.nickname, style: `color: ${playerColor(m.playerId)}` }),
             el('span', { class: 'chat-text', text: m.text }),
           ),
         ),
@@ -525,7 +534,7 @@ export class OnlineApp {
           el(
             'li',
             { class: p.connected ? '' : 'off' },
-            el('span', { class: 'name', text: p.nickname }),
+            el('span', { class: 'name', text: p.nickname, style: `color: ${playerColor(p.id)}` }),
             p.isHost ? el('span', { class: 'chip host', text: '방장' }) : '',
             p.id === s.you ? el('span', { class: 'chip me', text: '나' }) : '',
             p.connected ? '' : el('span', { class: 'chip', text: '연결 끊김' }),
@@ -604,7 +613,7 @@ export class OnlineApp {
         el(
           'div',
           { class: 'controls' },
-          el('button', { type: 'button', class: 'btn', id: 'on-hint', text: '초성 힌트 (-50%)', title: '곡 제목의 초성을 나에게만 보여 줍니다. 이후 맞히면 점수가 절반', onclick: () => this.requestHint() }),
+          el('button', { type: 'button', class: 'btn', id: 'on-hint', text: '초성 힌트 (-50%)', title: '곡 제목(매우 어려움은 가수·작품명도)의 초성을 나에게만 보여 줍니다. 이후 맞히면 점수가 절반', onclick: () => this.requestHint() }),
           el('button', { type: 'button', class: 'btn ghost', id: 'on-pass', text: '패스 (K)', title: '단축키 K. 입력칸에 있을 때는 Esc를 누른 뒤 K', 'aria-keyshortcuts': 'K', onclick: () => this.session?.pass() }),
         ),
       ),
@@ -754,7 +763,7 @@ export class OnlineApp {
     hintBtn.disabled = !s.canHint;
     hintBtn.textContent = s.hint != null || s.hintRequested ? '힌트 사용함' : '초성 힌트 (-50%)';
     $('#on-hint-text').hidden = s.hint == null;
-    $('#on-hint-text').textContent = s.hint != null ? `제목 초성: ${s.hint}` : '';
+    $('#on-hint-text').textContent = formatHint(s.hint);
     // 답할 수 있게 되는 순간 입력칸에 자동 포커스(매 라운드 다시 클릭하지 않아도 되게)
     if (canAnswer && !this.answerWasReady && !easy) {
       const input = $('#on-answer-input');
@@ -843,13 +852,14 @@ export class OnlineApp {
           const total = s.round?.items?.length;
           const progress = total && p.status === 'ready' && p.solved > 0 ? `${p.solved}/${total}` : '';
           const chip = !p.connected ? '연결 끊김' : STATUS_CHIP[p.status] ?? progress;
+          const chipClass = !p.connected ? 'st-off' : STATUS_CLASS[p.status] ?? (progress ? 'st-progress' : '');
           const winner = revealed && (s.reveal.correctPlayers ?? []).some((c) => c.playerId === p.id);
           return el(
             'li',
             { class: `${p.id === s.you ? 'me' : ''} ${winner ? 'winner' : ''}`.trim() },
-            el('span', { class: 'name', text: p.nickname }),
-            chip ? el('span', { class: 'chip', text: chip }) : '',
-            p.hint ? el('span', { class: 'chip', text: '힌트' }) : '',
+            el('span', { class: 'name', text: p.nickname, style: `color: ${playerColor(p.id)}` }),
+            chip ? el('span', { class: `chip ${chipClass}`.trim(), text: chip }) : '',
+            p.hint ? el('span', { class: 'chip st-hint', text: '힌트' }) : '',
             el('span', { class: 'pts', text: `${p.score}점` }),
           );
         }),

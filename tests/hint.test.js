@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { GameSession, MODE, PLAYER_STATE } from '../js/game.js';
-import { DIFFICULTY, initialHint } from '../js/judge.js';
+import { DIFFICULTY, formatHint, hintParts, initialHint } from '../js/judge.js';
 import { applyHint } from '../js/scoring.js';
 import { OnlineSession } from '../js/online/session.js';
 import { DurationCache, createMemoryStorage } from '../js/songs.js';
@@ -58,7 +58,7 @@ test('개인전 힌트: 소리가 난 뒤 1번만, 맞히면 점수 절반, 결�
   assert.equal(game.useHint(), null);
   beginAudio(game);
   assert.equal(game.canHint, true);
-  assert.equal(game.useHint(), initialHint(game.round.song.title));
+  assert.deepEqual(game.useHint(), [{ key: 'title', text: initialHint(game.round.song.title) }]);
   assert.equal(game.canHint, false, '라운드당 1번');
   assert.equal(game.useHint(), null);
   game.submitAnswer(game.round.song.title);
@@ -104,7 +104,8 @@ test('대결 힌트: 요청한 사람에게만 초성을 보내고, state에는 
   env.joinAll('a', 'b');
   env.begin();
   env.send('a', { type: 'hint', roundId: env.round().id });
-  assert.deepEqual(env.last('a', 'hint'), { type: 'hint', roundId: 1, text: initialHint(env.round().song.title) });
+  const title = initialHint(env.round().song.title);
+  assert.deepEqual(env.last('a', 'hint'), { type: 'hint', roundId: 1, text: title, parts: [{ key: 'title', text: title }] });
   assert.equal(env.msgs('b', 'hint').length, 0);
   assert.deepEqual(env.state().players.map((p) => p.hint), [true, false]);
   assert.ok(!JSON.stringify(env.msgs('b')).includes(initialHint(env.round().song.title)), '다른 사람에게 초성이 가지 않는다');
@@ -188,10 +189,80 @@ test('세션 힌트: 답할 수 있을 때만 요청, 받은 초성 저장, 라�
   assert.equal(session.requestHint(), true);
   assert.deepEqual(sent.at(-1), { type: 'hint', roundId: 3 });
   assert.equal(session.requestHint(), false, '응답을 기다리는 중에는 다시 보내지 않음');
-  receive({ type: 'hint', roundId: 3, text: 'ㅅㅇㅎㅌ' });
-  assert.equal(session.hint, 'ㅅㅇㅎㅌ');
+  receive({ type: 'hint', roundId: 3, text: 'ㅅㅇㅎㅌ', parts: [{ key: 'title', text: 'ㅅㅇㅎㅌ' }, { key: 'artist', text: 'ㄹㅅ' }] });
+  assert.deepEqual(session.hint, [{ key: 'title', text: 'ㅅㅇㅎㅌ' }, { key: 'artist', text: 'ㄹㅅ' }]);
   assert.equal(session.canHint, false);
   receive({ type: 'prepare', roundId: 4, choices: null });
   assert.equal(session.hint, null);
   assert.equal(session.hintRequested, false);
+});
+
+test('hintParts: 매우 어려움은 곡에 있는 항목 전부, 그 밖에는 제목만', () => {
+  const song = { title: '사이하테', artist: '요네즈 켄시', anime: { name: '체인소 맨', aliases: [] } };
+  assert.deepEqual(hintParts(song, DIFFICULTY.NORMAL), [{ key: 'title', text: 'ㅅㅇㅎㅌ' }]);
+  assert.deepEqual(hintParts(song, DIFFICULTY.HARD), [{ key: 'title', text: 'ㅅㅇㅎㅌ' }]);
+  assert.deepEqual(hintParts(song, DIFFICULTY.EXTREME), [
+    { key: 'title', text: 'ㅅㅇㅎㅌ' },
+    { key: 'artist', text: 'ㅇㄴㅈ ㅋㅅ' },
+    { key: 'anime', text: 'ㅊㅇㅅ ㅁ' },
+  ]);
+  assert.deepEqual(hintParts({ title: 'Only Way', artist: '9Lana' }, DIFFICULTY.EXTREME), [
+    { key: 'title', text: 'O___ W__' },
+    { key: 'artist', text: '9L___' },
+  ], '작품 없는 일반 노래는 제목·가수');
+});
+
+test('formatHint: 항목 하나면 "제목 초성: …", 여럿이면 항목별로', () => {
+  assert.equal(formatHint(null), '');
+  assert.equal(formatHint([{ key: 'title', text: 'ㅅㅇㅎㅌ' }]), '제목 초성: ㅅㅇㅎㅌ');
+  assert.equal(formatHint([{ key: 'title', text: 'ㅅㅇㅎㅌ' }, { key: 'artist', text: 'ㄹㅅ' }]), '초성 — 제목 ㅅㅇㅎㅌ · 가수 ㄹㅅ');
+});
+
+test('대결 힌트: 매우 어려움은 가수·작품명 초성도 보낸다', () => {
+  const env = createEnv({ songs: Array.from({ length: 4 }, (_, i) => makeSong(i + 1, { duration: 200, artist: `가수 ${i + 1}` })) });
+  env.joinAll('a', 'b');
+  env.send('a', { type: 'settings', settings: { difficulty: 'extreme' } });
+  env.begin();
+  env.send('a', { type: 'hint', roundId: env.round().id });
+  assert.deepEqual(env.last('a', 'hint').parts.map((p) => p.key), ['title', 'artist', 'anime']);
+});
+
+test('개인전 답변 시간: 구간이 끝나고 정한 시간이 지나면 시간 초과로 공개, 제한 없음은 계속 기다림', () => {
+  const { game, clock } = soloSetup({ answerTime: 10 });
+  beginAudio(game);
+  game.player.time = game.round.segmentStart + 5;
+  game.tick(); // 구간 끝 → STOPPED, 답변 시간 시작
+  assert.equal(game.phase, 'stopped');
+  assert.equal(game.answerSecondsLeft(), 10);
+  clock.advance(9_000);
+  game.tick();
+  assert.equal(game.phase, 'stopped');
+  assert.equal(Math.ceil(game.answerSecondsLeft()), 1);
+  clock.advance(1_000);
+  game.tick();
+  assert.equal(game.phase, 'revealed');
+  assert.equal(game.round.result.reason, 'timeout');
+  assert.equal(game.round.result.points, 0);
+
+  const free = soloSetup();
+  beginAudio(free.game);
+  free.game.player.time = free.game.round.segmentStart + 5;
+  free.game.tick();
+  assert.equal(free.game.answerSecondsLeft(), null);
+  free.clock.advance(600_000);
+  free.game.tick();
+  assert.equal(free.game.phase, 'stopped', '제한 없음(기본)');
+});
+
+test('개인전 답변 시간: 다시듣기를 하면 다시 들은 구간이 끝난 뒤부터 새로 센다', () => {
+  const { game, clock } = soloSetup({ answerTime: 10 });
+  beginAudio(game);
+  game.player.time = game.round.segmentStart + 5;
+  game.tick();
+  clock.advance(8_000);
+  game.replay();
+  assert.equal(game.round.answerDeadline, null);
+  clock.advance(5_000); // 원래 마감이 지났지만 다시듣기 중
+  game.tick();
+  assert.notEqual(game.phase, 'revealed');
 });

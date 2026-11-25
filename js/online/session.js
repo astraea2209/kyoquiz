@@ -4,6 +4,15 @@
 
 import { SCORING } from '../scoring.js';
 
+// 플레이어 색(채팅 이름·참가자·순위판). 방 안 입장 순서(p1, p2, …)로 정해 최대 인원 8명이 모두 다르다
+export const PLAYER_COLORS = Object.freeze(['#6c8cff', '#3ecf8e', '#ffb84d', '#ff7eb6', '#4dd0e1', '#b892ff', '#ff8a65', '#c6e05a']);
+
+/** playerId('p3' 등)의 색. 모르는 형식이면 첫 색 */
+export function playerColor(playerId) {
+  const n = Number.parseInt(String(playerId ?? '').replace(/\D/g, ''), 10);
+  return PLAYER_COLORS[(Number.isFinite(n) && n > 0 ? n - 1 : 0) % PLAYER_COLORS.length];
+}
+
 /** 채팅 한도(서버 ROOM_CONFIG와 같은 값. 서버가 최종 판단한다) */
 export const CHAT_LIMITS = Object.freeze({ maxLength: 100, cooldownMs: 500, keep: 100 });
 
@@ -35,7 +44,7 @@ export class OnlineSession {
     this.feedback = null; // 'correct' | 'partial' | 'already' | 'wrong' | 'rate' | null
     this.wrongChoices = new Set(); // 객관식에서 이미 틀린 보기 번호
     this.lastChoice = null;
-    this.hint = null; // 이번 라운드에 받은 초성 힌트
+    this.hint = null; // 이번 라운드에 받은 초성 힌트 [{key, text}]
     this.hintRequested = false;
     this.feedbackAt = 0;
     this.kicked = false;
@@ -108,7 +117,8 @@ export class OnlineSession {
         }
         break;
       case 'hint':
-        if (this.round?.roundId === message.roundId) this.hint = message.text;
+        // parts: [{key, text}](매우 어려움은 제목·가수·작품명). 예전 서버는 text(제목)만 보낸다
+        if (this.round?.roundId === message.roundId) this.hint = Array.isArray(message.parts) ? message.parts : [{ key: 'title', text: message.text }];
         break;
       case 'rateLimited':
         if (this.round?.roundId === message.roundId) this.setFeedback('rate');

@@ -6,7 +6,7 @@
 //   onStateChange(cb(state)) → 구독 해제 함수,  onError(cb(code)) → 구독 해제 함수
 // state 값은 PLAYER_STATE 참고.
 
-import { DIFFICULTY, buildChoices, canUseMultipleChoice, initialHint, itemCandidates, judgeAnswer, judgeItems, shuffle } from './judge.js';
+import { DIFFICULTY, buildChoices, canUseMultipleChoice, hintParts, itemCandidates, judgeAnswer, judgeItems, shuffle } from './judge.js';
 import { SCORING, applyHint, scoreExtremeBonus, scoreExtremeItem, scoreFull, scoreRandom } from './scoring.js';
 import { pickSegmentStart } from './segment.js';
 
@@ -45,7 +45,8 @@ export class GameSession {
   /**
    * @param {object} opts
    * @param {object[]} opts.songs       이번 게임에 쓸 수 있는(사용 중인) 곡
-   * @param {object} opts.settings      {mode, clipLength, rounds, difficulty, timeLimit}
+   * @param {object} opts.settings      {mode, clipLength, rounds, difficulty, timeLimit, answerTime}
+   *   answerTime: 랜덤듣기에서 구간이 끝난 뒤 답할 수 있는 초(0이면 제한 없음)
    * @param {object[]} opts.players     플레이어 1~2개. 2개면 번갈아 쓰며 다음 곡을 미리 cue한다.
    * @param {object} [opts.durationCache] {get(videoId), set(videoId, seconds)}
    * @param {Function} [opts.rng]
@@ -70,6 +71,7 @@ export class GameSession {
       rounds: 10,
       difficulty: DIFFICULTY.NORMAL,
       timeLimit: SCORING.full.timeLimit,
+      answerTime: SCORING.solo.defaultAnswerTime,
       ...settings,
     };
     this.players = players;
@@ -167,7 +169,7 @@ export class GameSession {
       song,
       segmentStart: this.isRandom ? null : 0,
       replayUsed: false,
-      hint: null, // 초성 힌트를 봤으면 그 글자(제목 초성)
+      hint: null, // 초성 힌트를 봤으면 [{key, text}](매우 어려움은 제목·가수·작품명, 그 밖에는 제목)
       wrongCount: 0,
       choices: this.difficulty === DIFFICULTY.EASY ? buildChoices(song, this.allSongs, this.rng) : null,
       disabledChoices: new Set(),
@@ -183,6 +185,7 @@ export class GameSession {
       seekObservedAt: null,
       accumulated: 0,
       audibleSince: null,
+      answerDeadline: null, // 랜덤듣기 답변 시간 제한: 구간이 끝난 뒤 이 시각(ms)까지
     };
     this.phase = PHASE.READY;
   }
@@ -234,6 +237,7 @@ export class GameSession {
     const round = this.round;
     if (!this.canReplay) return false;
     round.replayUsed = true;
+    round.answerDeadline = null; // 다시 들은 구간이 끝나면 답변 시간을 새로 센다
     this.pauseAudio();
     round.stage = 'seek';
     round.seekObservedAt = null;
@@ -263,10 +267,10 @@ export class GameSession {
     return this.difficulty !== DIFFICULTY.EASY && this.canAnswer && this.round.hint == null;
   }
 
-  /** 제목 초성 힌트를 연다. 이후 맞히면 점수가 줄어든다(SCORING.hint). @returns 힌트 글자 또는 null */
+  /** 초성 힌트를 연다. 이후 맞히면 점수가 줄어든다(SCORING.hint). @returns 힌트 항목 [{key, text}] 또는 null */
   useHint() {
     if (!this.canHint) return null;
-    this.round.hint = initialHint(this.round.song.title);
+    this.round.hint = hintParts(this.round.song, this.difficulty);
     this.changed();
     return this.round.hint;
   }
@@ -562,14 +566,31 @@ export class GameSession {
     this.pauseAudio();
     this.player.pause();
     this.player.mute();
-    this.stopPolling();
     this.phase = PHASE.STOPPED;
+    const limit = this.settings.answerTime;
+    if (limit > 0) {
+      // 답변 시간 제한: 폴링을 계속하며 남은 시간을 갱신하고, 끝나면 시간 초과로 공개한다
+      this.round.answerDeadline = this.now() + limit * 1000;
+    } else {
+      this.stopPolling();
+    }
     this.changed();
+  }
+
+  /** 랜덤듣기 답변 시간 제한의 남은 초(제한이 없거나 아직 구간이 안 끝났으면 null) */
+  answerSecondsLeft() {
+    const deadline = this.round?.answerDeadline;
+    if (deadline == null || this.phase !== PHASE.STOPPED) return null;
+    return Math.max(0, (deadline - this.now()) / 1000);
   }
 
   tick() {
     const r = this.round;
     if (!r) return;
+    if (this.phase === PHASE.STOPPED && r.answerDeadline != null && this.now() >= r.answerDeadline) {
+      this.reveal('timeout');
+      return;
+    }
     const playing = this.playerStates[this.active] === PLAYER_STATE.PLAYING;
 
     if (this.phase === PHASE.LOADING) {

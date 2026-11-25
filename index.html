@@ -46,6 +46,13 @@
           <label><input type="radio" name="clipLength" value="10" /><span>10초</span></label>
           <label><input type="radio" name="clipLength" value="15" /><span>15초</span></label>
         </fieldset>
+        <fieldset class="segmented" id="answer-time-setting">
+          <legend>답변 시간 (구간이 끝난 뒤)</legend>
+          <label><input type="radio" name="answerTime" value="0" checked /><span>제한 없음</span></label>
+          <label><input type="radio" name="answerTime" value="10" /><span>10초</span></label>
+          <label><input type="radio" name="answerTime" value="15" /><span>15초</span></label>
+          <label><input type="radio" name="answerTime" value="20" /><span>20초</span></label>
+        </fieldset>
         <fieldset class="segmented">
           <legend>라운드</legend>
           <label><input type="radio" name="rounds" value="5" /><span>5</span></label>
@@ -114,7 +121,7 @@
       <div class="controls">
         <button type="button" class="btn primary" id="play-btn">재생</button>
         <button type="button" class="btn" id="replay-btn">다시듣기 (-20점)</button>
-        <button type="button" class="btn" id="hint-btn" title="곡 제목의 초성을 보여 줍니다. 이후 맞히면 점수가 절반">초성 힌트 (-50%)</button>
+        <button type="button" class="btn" id="hint-btn" title="곡 제목(매우 어려움은 가수·작품명도)의 초성을 보여 줍니다. 이후 맞히면 점수가 절반">초성 힌트 (-50%)</button>
         <button type="button" class="btn ghost" id="pass-btn" title="단축키 K. 입력칸에 있을 때는 Esc를 누른 뒤 K" aria-keyshortcuts="K">패스 (K)</button>
       </div>
 

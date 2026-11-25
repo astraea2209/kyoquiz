@@ -2,7 +2,7 @@
 
 import { GameSession, MODE, PHASE } from './game.js';
 import { handleGameKey } from './hotkeys.js';
-import { DIFFICULTY } from './judge.js';
+import { DIFFICULTY, formatHint } from './judge.js';
 import { parseYouTubeLink, youtubeWatchUrl } from './linkParser.js';
 import { SCORING, parseRounds } from './scoring.js';
 import { loadSettings, parseDurationText, saveSettings, searchSongs, splitAliases } from './songs.js';
@@ -125,7 +125,7 @@ export class App {
   restoreSettings() {
     const saved = loadSettings(this.storage);
     if (!saved) return;
-    for (const name of ['mode', 'clipLength', 'rounds', 'difficulty']) {
+    for (const name of ['mode', 'clipLength', 'answerTime', 'rounds', 'difficulty']) {
       const input = $(`input[name="${name}"][value="${saved[name]}"]`);
       if (input) input.checked = true;
     }
@@ -160,6 +160,7 @@ export class App {
     return {
       mode: value('mode') === MODE.FULL ? MODE.FULL : MODE.RANDOM,
       clipLength: Number(value('clipLength')) || SCORING.defaultClipLength,
+      answerTime: SCORING.solo.answerTimes.includes(Number(value('answerTime'))) ? Number(value('answerTime')) : SCORING.solo.defaultAnswerTime,
       rounds: Number(value('rounds')) || parseRounds($('#rounds-custom').value) || SCORING.defaultRounds,
       difficulty: value('difficulty') || DIFFICULTY.NORMAL,
       timeLimit: SCORING.full.timeLimit,
@@ -184,6 +185,7 @@ export class App {
     const playable = this.store.playable();
     const total = this.store.all().length;
     $('#clip-setting').disabled = settings.mode !== MODE.RANDOM;
+    $('#answer-time-setting').disabled = settings.mode !== MODE.RANDOM;
     $('#difficulty-hint').textContent = DIFFICULTY_HINT[settings.difficulty];
     $('#empty-notice').hidden = playable.length > 0;
     $('#song-count').textContent =
@@ -365,15 +367,18 @@ export class App {
       [PHASE.READY]: '재생 버튼을 눌러 주세요',
       [PHASE.LOADING]: round.heard ? '다시 재생 준비 중…' : '불러오는 중…',
       [PHASE.PLAYING]: '재생 중',
-      [PHASE.STOPPED]: '구간 재생이 끝났어요',
+      [PHASE.STOPPED]: round.answerDeadline != null ? '구간 재생이 끝났어요. 시간 안에 답하세요' : '구간 재생이 끝났어요',
       [PHASE.REVEALED]: '정답 공개',
     }[phase] ?? '';
 
     // 진행 바
     $('#progress-bar').style.width = `${Math.round(game.progress * 100)}%`;
-    $('#progress-label').textContent = game.isRandom
-      ? `구간 ${s.clipLength}초`
-      : `${Math.min(game.audibleElapsed(), s.timeLimit).toFixed(1)} / ${s.timeLimit}초`;
+    const answerLeft = game.answerSecondsLeft();
+    $('#progress-label').textContent = !game.isRandom
+      ? `${Math.min(game.audibleElapsed(), s.timeLimit).toFixed(1)} / ${s.timeLimit}초`
+      : answerLeft != null
+        ? `구간 ${s.clipLength}초 · 남은 시간 ${Math.ceil(answerLeft)}초`
+        : `구간 ${s.clipLength}초`;
 
     // 컨트롤
     $('#play-btn').hidden = phase !== PHASE.READY;
@@ -386,7 +391,7 @@ export class App {
     hintBtn.disabled = !game.canHint;
     hintBtn.textContent = round.hint ? '힌트 사용함' : '초성 힌트 (-50%)';
     $('#hint-text').hidden = round.hint == null;
-    $('#hint-text').textContent = round.hint ? `제목 초성: ${round.hint}` : '';
+    $('#hint-text').textContent = formatHint(round.hint);
 
     // 답 입력
     $('#answer-area').hidden = revealed;

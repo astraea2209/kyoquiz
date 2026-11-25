@@ -95,6 +95,7 @@ legend { color: var(--muted); font-size: 0.9rem; margin-bottom: 6px; }
   background: var(--panel);
   cursor: pointer;
 }
+.mode-card { position: relative; } /* 숨긴 라디오 버튼이 화면 폭만큼 늘어나 가로 스크롤이 생기지 않게 */
 .mode-card input { position: absolute; opacity: 0; pointer-events: none; }
 .mode-card:has(input:checked) { border-color: var(--accent); background: #1f2540; }
 .mode-card:has(input:focus-visible) { outline: 2px solid var(--accent); }
@@ -304,6 +305,13 @@ textarea { min-height: 100px; margin: 8px 0; }
 .chip { padding: 2px 8px; border-radius: 999px; background: var(--panel-2); color: var(--muted); font-size: 0.78rem; white-space: nowrap; }
 .chip.host { background: #3a3010; color: var(--warn); }
 .chip.me { background: #1f2540; color: var(--accent); }
+/* 대결 순위판 상태 칩: 정답 초록, 패스 회색, 기회 소진 빨강, 힌트 주황, 매우 어려움 진행(1/3) 파랑, 제외·연결 끊김 흐리게 */
+.chip.st-correct { background: #17392b; color: var(--ok); font-weight: 700; }
+.chip.st-passed { background: #34384a; color: #d3d7e4; }
+.chip.st-exhausted { background: #3d1f24; color: var(--bad); font-weight: 700; }
+.chip.st-hint { background: #3a2e14; color: var(--warn); }
+.chip.st-progress { background: #1f2a4d; color: var(--accent); font-weight: 700; }
+.chip.st-off { background: transparent; border: 1px dashed #4a4f62; }
 .overlay-text { font-size: 1.15rem; font-weight: 600; }
 .settings fieldset:disabled { opacity: 0.55; }
 .settings fieldset:disabled span { cursor: default; }
@@ -327,6 +335,5 @@ textarea { min-height: 100px; margin: 8px 0; }
 .chat-log:empty::before { content: attr(data-empty); color: var(--muted); }
 .chat-log li { overflow-wrap: anywhere; padding: 1px 0; }
 .chat-name { color: var(--accent); font-weight: 600; margin-right: 6px; }
-.chat-log li.me .chat-name { color: var(--ok); }
 .chat-status { min-height: 1.2em; margin: 4px 0; font-size: 0.85rem; color: var(--warn); }
 .chat-form input { min-width: 0; }

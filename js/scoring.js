@@ -12,6 +12,11 @@ export const SCORING = Object.freeze({
     decay: 80, // max - decay = 최저 점수(20)
     timeLimit: 30, // 초
   },
+  // 개인전 랜덤듣기: 구간이 끝난 뒤 답할 수 있는 시간(초). 0은 제한 없음(기본)
+  solo: Object.freeze({
+    answerTimes: Object.freeze([0, 10, 15, 20]),
+    defaultAnswerTime: 0,
+  }),
   // 멀티플레이(친구와 대결, 맞힌 사람 모두 속도 점수). 숫자는 초안이므로 플레이 테스트 뒤 여기만 고친다.
   multi: Object.freeze({
     speedBonusMax: 0.5, // 랜덤듣기: 기본 점수의 최대 +50%

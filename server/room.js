@@ -12,12 +12,12 @@
 // 클라이언트 → 서버: join, settings, start, ready, answer, pass, hint, playerError, chat, ping, leave
 // 서버 → 클라이언트: joined, state, prepare, go, locked, answerResult, rateLimited, reveal, gameOver, notice, error, pong, kicked,
 //                   hint, chat, chatLog, chatBlocked
-// 초성 힌트: 쉬움 제외, 답할 수 있는 사람이 라운드당 1번 요청하면 본인에게만 제목 초성을 보낸다. 이후 얻는 점수는 SCORING.hint만큼 깎인다.
+// 초성 힌트: 쉬움 제외, 답할 수 있는 사람이 라운드당 1번 요청하면 본인에게만 초성을 보낸다(매우 어려움은 가수·작품명도). 이후 얻는 점수는 SCORING.hint만큼 깎인다.
 // 채팅: 대기실·게임·결과 어디서나. 라운드 중(공개 전)에는 정답이 들어간 채팅을 막는다(chatBlocked {reason: 'answer'}).
 // 라운드 메시지(ready, answer, pass, playerError)는 roundId가 현재 라운드와 다르면 조용히 무시한다.
 // 공개(reveal) 전에는 곡 제목·별칭·정답 위치를 어떤 메시지에도 싣지 않는다.
 
-import { DIFFICULTY, buildChoices, canUseMultipleChoice, initialHint, itemCandidates, judgeAnswer, judgeItems, revealsAnswer, shuffle } from '../js/judge.js';
+import { DIFFICULTY, buildChoices, canUseMultipleChoice, hintParts, itemCandidates, judgeAnswer, judgeItems, revealsAnswer, shuffle } from '../js/judge.js';
 import { MODE } from '../js/game.js';
 import { SCORING, answerWindow, applyHint, isValidRounds, scoreExtremeBonus, scoreExtremeItem, scoreMulti } from '../js/scoring.js';
 import { pickSegmentStart } from '../js/segment.js';
@@ -49,7 +49,7 @@ export const ROOM_CONFIG = Object.freeze({
   maxPlayers: SCORING.multi.maxPlayers,
   goLeadMs: 3000, // go를 보낸 뒤 실제 시작까지(네트워크 지연 흡수용 카운트다운)
   readyTimeoutMs: 10000,
-  revealMs: 8000, // 정답 공개 후 다음 라운드까지
+  revealMs: 10000, // 정답 공개 후 다음 라운드까지(영상이 보이는 시간)
   reconnectGraceMs: 60000,
   answerCooldownMs: 1000,
   maxNicknameLength: 12,
@@ -858,7 +858,9 @@ export class Room {
     if (!entry || entry.status !== PLAYER_STATUS.READY || entry.hintUsed) return;
     if (this.difficulty === DIFFICULTY.EASY || this.now() < round.startAt) return;
     entry.hintUsed = true;
-    this.sendToPlayer(player, { type: 'hint', roundId: round.id, text: initialHint(round.song.title) });
+    // parts: 매우 어려움은 제목·가수·작품명, 그 밖에는 제목. text는 제목 초성(이전 클라이언트 호환)
+    const parts = hintParts(round.song, this.difficulty);
+    this.sendToPlayer(player, { type: 'hint', roundId: round.id, text: parts.find((p) => p.key === 'title')?.text ?? '', parts });
     this.broadcastState();
   }
 
