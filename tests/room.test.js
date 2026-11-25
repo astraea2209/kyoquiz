@@ -101,14 +101,89 @@ test('시작: 방장만, 2명 이상', () => {
   assert.equal(env.state().phase, ROOM_PHASE.PREPARING);
 });
 
-test('시작한 뒤에는 새로 입장할 수 없다', () => {
+test('게임 중에도 새로 입장: 진행 중인 라운드는 쉬고 다음 라운드부터 0점으로 합류', () => {
   const env = createEnv();
   env.joinAll('a', 'b');
   env.begin();
-  env.send('c', { type: 'join', nickname: '지각생' });
-  assert.equal(env.last('c', 'error').code, 'game-started');
-  env.send('c', { type: 'join', nickname: '지각생', token: 'not-a-token' });
-  assert.equal(env.last('c', 'error').code, 'game-started');
+  const roundId = env.round().id;
+  const joined = env.join('c', '지각생', 'not-a-token'); // 모르는 토큰이면 새 입장
+  assert.equal(joined.reconnected, false);
+  assert.equal(env.msgs('c', 'error').length, 0);
+  assert.equal(env.msgs('c', 'prepare').length, 0, '진행 중인 라운드에는 끼지 않는다');
+  const me = env.state().players.find((p) => p.id === joined.playerId);
+  assert.equal(me.status, 'absent');
+  assert.equal(me.score, 0);
+  assert.equal(env.last('c', 'state').phase, ROOM_PHASE.ANSWERING);
+  // 기존 참가자에게만 알림
+  assert.match(env.last('a', 'notice').message, /지각생님이 들어왔어요/);
+  assert.equal(env.msgs('c', 'notice').length, 0);
+
+  // 이번 라운드 답은 무시되고, 라운드는 기존 두 사람 기준으로 끝난다
+  env.send('c', { type: 'answer', roundId, text: env.correctText() });
+  assert.equal(env.msgs('c', 'answerResult').length, 0);
+  env.answer('a', env.correctText());
+  env.passRest();
+  assert.equal(env.state().phase, ROOM_PHASE.REVEALED);
+  assert.equal(env.msgs('c', 'reveal').length, 1, '공개는 같이 본다');
+
+  env.timers.advance(env.room.config.revealMs);
+  assert.equal(env.msgs('c', 'prepare').length, 1);
+  assert.equal(env.state().players.find((p) => p.id === joined.playerId).status, 'preparing');
+  env.readyAll();
+  env.timers.advance(env.room.config.goLeadMs);
+  env.answer('c', env.correctText());
+  assert.equal(env.last('c', 'answerResult').correct, true);
+});
+
+test('게임 중 입장도 최대 인원까지', () => {
+  const env = createEnv({ config: { maxPlayers: 2 } });
+  env.joinAll('a', 'b');
+  env.begin();
+  env.send('c', { type: 'join', nickname: 'c' });
+  assert.equal(env.last('c', 'error').code, 'room-full');
+});
+
+test('정답 공개 중에 들어오면 다음 라운드부터 함께', () => {
+  const env = createEnv();
+  env.joinAll('a', 'b');
+  env.begin();
+  env.passRest();
+  assert.equal(env.state().phase, ROOM_PHASE.REVEALED);
+  env.join('c', 'c');
+  assert.equal(env.msgs('c', 'reveal').length, 0);
+  env.timers.advance(env.room.config.revealMs);
+  assert.equal(env.msgs('c', 'prepare').length, 1);
+});
+
+test('게임 중에 들어온 사람도 최종 순위에 들어간다', () => {
+  const env = createEnv({ songCount: 2 });
+  env.joinAll('a', 'b');
+  env.send('a', { type: 'settings', settings: { rounds: 2 } });
+  env.begin();
+  env.join('c', 'c');
+  env.passRest();
+  env.timers.advance(env.room.config.revealMs);
+  env.readyAll();
+  env.timers.advance(env.room.config.goLeadMs);
+  env.answer('c', env.correctText());
+  env.passRest();
+  env.timers.advance(env.room.config.revealMs);
+  const over = env.last('c', 'gameOver');
+  assert.equal(over.reason, 'complete');
+  assert.equal(over.ranking[0].nickname, 'c');
+  assert.equal(over.history.length, 2);
+});
+
+test('모두 끊겨 멈춘 게임에 새로 들어오면 결과 화면, 새로 온 사람이 방장', () => {
+  const env = createEnv();
+  env.joinAll('a', 'b');
+  env.begin();
+  env.room.handleDisconnect('a');
+  env.room.handleDisconnect('b');
+  const joined = env.join('c', 'c');
+  assert.equal(env.last('c', 'gameOver').reason, 'not-enough-players');
+  assert.equal(env.state().phase, ROOM_PHASE.RESULTS);
+  assert.equal(env.state().hostId, joined.playerId);
 });
 
 test('곡이 없으면 시작하지 않는다(랜덤듣기는 길이 정보가 필요)', () => {
@@ -161,9 +236,11 @@ test('재접속 유예 60초가 지나면 퇴장 처리(순위 기록은 남음)
   assert.equal(env.state().players[1].left, false);
   env.timers.advance(1);
   assert.equal(env.state().players[1].left, true);
-  // 토큰은 더 이상 통하지 않는다(게임 중 새 입장 불가)
-  env.send('b2', { type: 'join', nickname: 'b', token: jb.token });
-  assert.equal(env.last('b2', 'error').code, 'game-started');
+  // 토큰은 더 이상 통하지 않는다. 다시 들어오면 새 참가자(점수 0, 같은 닉네임은 b2)
+  const again = env.join('b2', 'b', jb.token);
+  assert.equal(again.reconnected, false);
+  assert.notEqual(again.playerId, jb.playerId);
+  assert.equal(env.state().players.find((p) => p.id === again.playerId).nickname, 'b2');
 });
 
 test('같은 토큰으로 다른 연결이 들어오면 이전 연결은 밀려난다', () => {

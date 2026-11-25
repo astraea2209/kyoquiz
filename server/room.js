@@ -4,6 +4,7 @@
 // send(connId, message)로 소켓에 쓰면 된다.
 //
 // 단계: 대기실(lobby) → 준비(preparing) → 시작 대기(starting) → 답변(answering) → 공개(revealed) → … → 결과(results)
+// 입장: 어느 단계에서나 새로 들어올 수 있다(최대 인원까지). 게임 중에 들어오면 진행 중인 라운드는 쉬고 다음 라운드부터 0점으로 합류한다.
 // 라운드 종료: 참가자 전원이 정답을 맞혔거나 포기·오답 소진·제외됐을 때, 또는 답변 시간이 끝났을 때 중 먼저 오는 것.
 // 정답자는 각자 도착 시간에 따른 점수를 받는다(첫 정답자가 나와도 라운드는 계속된다).
 // 매우 어려움: 제목·가수·작품명(곡에 있는 항목)을 각자 맞힌 시점의 속도 점수로 나눠 받고, 전부 맞혀야 '정답'으로 잠긴다.
@@ -337,10 +338,6 @@ export class Room {
     const existing = token ? this.members.find((p) => p.token === token) : null;
     if (existing) return this.reattach(existing, connId);
 
-    if (this.phase !== ROOM_PHASE.LOBBY && this.phase !== ROOM_PHASE.RESULTS) {
-      this.sendTo(connId, errorMessage('game-started', '이미 시작한 게임에는 새로 입장할 수 없습니다.'));
-      return;
-    }
     if (this.members.length >= this.config.maxPlayers) {
       this.sendTo(connId, errorMessage('room-full', `방이 가득 찼습니다(최대 ${this.config.maxPlayers}명).`));
       return;
@@ -364,9 +361,23 @@ export class Room {
     };
     this.players.set(player.id, player);
     this.connToPlayer.set(connId, player.id);
-    if (!this.hostId) this.hostId = player.id;
+    // 방장이 없거나 끊겨 있으면(접속한 사람이 없을 때 끊긴 방장) 접속한 사람 중에서 다시 정한다
+    if (!this.players.get(this.hostId)?.connected) this.electHost();
     this.sendTo(connId, { type: 'joined', code: this.code, playerId: player.id, token: player.token, reconnected: false });
     this.sendChatLog(connId);
+
+    // 게임 중에 들어온 사람: 진행 중인 라운드에는 자리가 없어(상태 absent) 다음 라운드부터 0점으로 합류한다
+    if (this.isInGame) {
+      for (const p of this.connectedMembers) {
+        if (p !== player) this.sendToPlayer(p, { type: 'notice', message: `${player.nickname}님이 들어왔어요. 다음 라운드부터 함께해요.` });
+      }
+      if (this.stalled) {
+        // 모두 끊겨 멈춰 있던 게임: 이어 갈 인원이 없으니 결과 화면으로
+        this.stalled = false;
+        this.gameOver('not-enough-players');
+        return;
+      }
+    }
     this.broadcastState();
   }
 
@@ -380,6 +391,7 @@ export class Room {
     player.connId = connId;
     player.connected = true;
     this.connToPlayer.set(connId, player.id);
+    if (!this.players.get(this.hostId)?.connected) this.electHost();
     this.sendTo(connId, { type: 'joined', code: this.code, playerId: player.id, token: player.token, reconnected: true });
     this.sendChatLog(connId);
 

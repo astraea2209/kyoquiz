@@ -47,6 +47,61 @@ export function parseDurationText(text) {
   return total > 0 ? total : null;
 }
 
+/** 초 → 곡 길이 입력 형식("3:45", "1:02:03"). 없으면 '', 정수가 아니면 초 그대로 */
+export function formatDurationText(seconds) {
+  if (seconds == null || seconds === '') return '';
+  const n = Number(seconds);
+  if (!Number.isFinite(n) || n <= 0) return '';
+  if (!Number.isInteger(n)) return String(n);
+  const pad = (v) => String(v).padStart(2, '0');
+  const [h, min, sec] = [Math.floor(n / 3600), Math.floor((n % 3600) / 60), n % 60];
+  return h ? `${h}:${pad(min)}:${pad(sec)}` : `${min}:${pad(sec)}`;
+}
+
+/** 곡 → 곡 관리 등록 폼에 채울 값(모두 문자열). 별칭은 쉼표로 잇는다 */
+export function songToFormValues(song) {
+  const join = (list) => (list ?? []).join(', ');
+  return {
+    link: song.videoId,
+    title: song.title,
+    titleAliases: join(song.titleAliases),
+    artist: song.artist ?? '',
+    artistAliases: join(song.artistAliases),
+    animeName: song.anime?.name ?? '',
+    animeAliases: join(song.anime?.aliases),
+    type: song.type ?? '',
+    duration: formatDurationText(song.duration),
+    hookStart: song.hookStart == null ? '' : String(song.hookStart),
+  };
+}
+
+/**
+ * 등록 폼 값 → 곡 원시 객체(정리는 normalizeSong이 한다). videoId와 duration은 화면에서 검사한 값을 받는다.
+ * original이 있으면(수정) 폼에 없는 필드(id, skipStart, skipEnd)와 사용 여부를 그대로 둔다.
+ */
+export function songFromForm(values, { videoId, duration }, original = null) {
+  const song = {
+    videoId,
+    title: values.title,
+    titleAliases: splitAliases(values.titleAliases),
+    artist: values.artist,
+    artistAliases: splitAliases(values.artistAliases),
+    anime: { name: values.animeName, aliases: splitAliases(values.animeAliases) },
+    type: values.type,
+    hookStart: String(values.hookStart ?? '').trim() === '' ? undefined : Number(values.hookStart),
+    duration,
+    enabled: true,
+  };
+  if (!original) return song;
+  return {
+    id: original.id,
+    ...song,
+    skipStart: original.skipStart,
+    skipEnd: original.skipEnd,
+    enabled: original.enabled !== false,
+  };
+}
+
 /** "a, b ,c" → ['a','b','c'] (쉼표·전각쉼표·읽기점 구분) */
 export function splitAliases(text) {
   return String(text ?? '')
@@ -216,6 +271,42 @@ export class SongStore {
     if (this.baseSongs.some((s) => s.videoId === videoId)) {
       writeJson(this.storage, STORAGE_KEYS.removed, [...new Set([...this.removed, videoId])]);
     }
+  }
+
+  /** songs.json(기본 목록)에 있는 영상인지 */
+  isBaseSong(videoId) {
+    return this.baseSongs.some((s) => s.videoId === videoId);
+  }
+
+  /** 이 브라우저에서 고친 songs.json 곡을 원래대로(내가 고친 내용만 지우고, 사용 여부는 유지) */
+  revert(videoId) {
+    if (!this.isBaseSong(videoId)) return false;
+    const mine = this.userSongs.find((s) => s.videoId === videoId);
+    if (!mine) return false;
+    writeJson(
+      this.storage,
+      STORAGE_KEYS.userSongs,
+      this.userSongs.filter((s) => s.videoId !== videoId),
+    );
+    if (!mine.enabled) this.setEnabled(videoId, false);
+    return true;
+  }
+
+  /**
+   * 이 브라우저에서 직접 추가하거나 고친 곡을 모두 지운다(보낸 목록이 다음 내보내기에 다시 들어가지 않게).
+   * 고친 songs.json 곡은 원래대로 돌아가고 꺼 둔 상태는 유지한다. 지운 곡 수를 돌려준다
+   */
+  clearUserSongs() {
+    const mine = this.userSongs;
+    if (!mine.length) return 0;
+    writeJson(this.storage, STORAGE_KEYS.userSongs, []);
+    const overrides = this.enabledOverrides;
+    for (const song of mine) {
+      if (!this.isBaseSong(song.videoId)) delete overrides[song.videoId];
+      else if (!song.enabled) overrides[song.videoId] = false;
+    }
+    writeJson(this.storage, STORAGE_KEYS.enabled, overrides);
+    return mine.length;
   }
 
   setEnabled(videoId, enabled) {
