@@ -224,6 +224,26 @@ test('SongStore: songs.json 곡 수정과 원래대로', () => {
   assert.equal(store.all().length, 3);
 });
 
+test('SongStore.clearUserSongs: 내 곡을 모두 지우고 다음 내보내기는 빈 목록', () => {
+  const store = new SongStore(createMemoryStorage(), [makeSong(1), makeSong(2), makeSong(3)]);
+  assert.equal(store.clearUserSongs(), 0);
+
+  store.add({ videoId: 'abcdefghijk', title: '내 곡' });
+  store.setEnabled('abcdefghijk', false);
+  store.add({ ...makeSong(1), title: '고친 곡', enabled: false });
+  store.add({ ...makeSong(2), title: '고친 곡 2' });
+  store.remove(makeSong(3).videoId); // songs.json 곡 숨김은 내 곡이 아니라 그대로
+
+  assert.equal(store.clearUserSongs(), 3);
+  assert.deepEqual(JSON.parse(store.exportJson({ userOnly: true })), []);
+  const all = store.all();
+  assert.deepEqual(all.map((s) => s.title).sort(), ['Song Title 1', 'Song Title 2']);
+  assert.ok(all.every((s) => s.source === 'base'));
+  assert.equal(all.find((s) => s.videoId === makeSong(1).videoId).enabled, false); // 꺼 둔 상태 유지
+  assert.ok(!('abcdefghijk' in store.enabledOverrides)); // 지운 곡의 사용 여부 기록도 정리
+  assert.equal(store.clearUserSongs(), 0);
+});
+
 test('exportJson({userOnly}): 직접 추가한 곡만 내보낸다', () => {
   const store = new SongStore(createMemoryStorage(), [makeSong(1), makeSong(2)]);
   store.add({ videoId: 'abcdefghijk', title: '내 곡', duration: 200 });

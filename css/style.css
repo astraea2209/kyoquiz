@@ -78,7 +78,7 @@ h2 { font-size: 1.15rem; margin: 1.2em 0 0.5em; }
 .file-btn { position: relative; }
 
 .actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0; }
-.actions .btn { flex: 1 1 140px; }
+.actions .btn { flex: 1 1 140px; word-break: keep-all; }
 
 /* 시작 화면 */
 fieldset { border: 0; padding: 0; margin: 0 0 14px; }

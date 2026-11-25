@@ -598,8 +598,25 @@ export class App {
       this.downloadJson(
         this.store.exportJson({ userOnly: true }),
         'my-songs.json',
-        `직접 추가한 ${count}곡을 내보냈습니다. 이 파일을 운영자에게 보내 주세요.`,
+        `직접 추가한 ${count}곡을 내보냈습니다. 이 파일을 운영자에게 보낸 뒤 "내 곡 전부 지우기"를 누르면 다음에 보낼 때 겹치지 않아요.`,
       );
+    });
+    $('#clear-mine-btn').addEventListener('click', () => {
+      const count = this.store.all().filter((s) => s.source === 'user').length;
+      if (!count) {
+        this.toast('이 브라우저에서 직접 추가하거나 고친 곡이 없습니다.');
+        return;
+      }
+      const ok = confirm(
+        `이 브라우저에서 직접 추가하거나 고친 ${count}곡을 모두 지울까요?\n` +
+          '되돌릴 수 없어요. 아직 보내지 않은 곡이 있으면 먼저 "내 곡만 내보내기"로 파일을 받아 두세요.\n' +
+          '(고친 songs.json 곡은 원래 내용으로 돌아가요)',
+      );
+      if (!ok) return;
+      if (this.editing && this.store.userSongs.some((s) => s.videoId === this.editing.videoId)) this.endEdit();
+      const removed = this.store.clearUserSongs();
+      this.toast(`내 곡 ${removed}곡을 지웠습니다.`);
+      this.renderManage();
     });
 
     $('#import-file').addEventListener('change', async (event) => {

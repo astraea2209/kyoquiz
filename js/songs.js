@@ -292,6 +292,23 @@ export class SongStore {
     return true;
   }
 
+  /**
+   * 이 브라우저에서 직접 추가하거나 고친 곡을 모두 지운다(보낸 목록이 다음 내보내기에 다시 들어가지 않게).
+   * 고친 songs.json 곡은 원래대로 돌아가고 꺼 둔 상태는 유지한다. 지운 곡 수를 돌려준다
+   */
+  clearUserSongs() {
+    const mine = this.userSongs;
+    if (!mine.length) return 0;
+    writeJson(this.storage, STORAGE_KEYS.userSongs, []);
+    const overrides = this.enabledOverrides;
+    for (const song of mine) {
+      if (!this.isBaseSong(song.videoId)) delete overrides[song.videoId];
+      else if (!song.enabled) overrides[song.videoId] = false;
+    }
+    writeJson(this.storage, STORAGE_KEYS.enabled, overrides);
+    return mine.length;
+  }
+
   setEnabled(videoId, enabled) {
     const overrides = this.enabledOverrides;
     overrides[videoId] = !!enabled;
