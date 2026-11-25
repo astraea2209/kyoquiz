@@ -552,7 +552,7 @@ export class OnlineApp {
     start.disabled = !enough;
     $('#on-lobby-hint').textContent = isHost
       ? enough
-        ? '준비되면 시작하세요. 시작한 뒤에는 새로 입장할 수 없어요.'
+        ? '준비되면 시작하세요. 시작한 뒤에 들어온 사람은 다음 라운드부터 함께해요.'
         : `${SCORING.multi.minPlayers}명 이상 모이면 시작할 수 있어요.`
       : '방장이 시작하길 기다리는 중…';
   }
@@ -690,9 +690,20 @@ export class OnlineApp {
     const room = s.room;
     const round = s.round;
     if (!round) {
-      // prepare를 받기 전(재접속 직후 등): 다음 라운드부터 합류한다
+      // prepare를 받기 전(게임 중에 새로 들어왔거나 재접속 직후): 다음 라운드부터 합류한다
+      $('#on-round-label').textContent = room.round ? `${room.round.index + 1} / ${room.round.total}` : '';
+      $('#on-mode-label').textContent = [MODE_LABEL[room.settings.mode], room.settings.mode === MODE.RANDOM ? `${room.settings.clipLength}초` : null, DIFFICULTY_LABEL[room.settings.difficulty]]
+        .filter(Boolean)
+        .join(' · ');
+      $('#on-score-label').textContent = `${s.me?.score ?? 0}점`;
       $('#on-overlay').classList.remove('hidden');
+      $('#on-eq').classList.remove('on');
       $('#on-overlay-text').textContent = '다음 라운드부터 함께해요';
+      $('#on-progress-bar').style.width = '0%';
+      $('#on-progress-label').textContent = '';
+      $('#on-answer-area').hidden = true;
+      $('#on-reveal').hidden = true;
+      $('#on-extreme-items').hidden = true;
       this.renderBoard(false);
       return;
     }
