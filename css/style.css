@@ -743,12 +743,28 @@ textarea { min-height: 100px; margin: 8px 0; resize: vertical; }
 .chat-form input { min-width: 0; }
 /* 옆 패널 안에서는 채팅 목록이 남는 높이를 채운다 */
 .game-side .chat-slot, .col-side .chat-slot { display: flex; flex-direction: column; min-height: 0; flex: 1; }
-.game-side .chat { flex: 1; }
-@media (min-width: 1000px) {
-  .game-side .chat-log { height: auto; flex: 1; min-height: 280px; }
-  .game-side .scoreboard { flex: none; max-height: 40vh; overflow-y: auto; }
-}
+.game-side .chat-slot .chat, .col-side .chat-slot .chat { flex: 1; }
 .col-side .chat-log { height: 300px; }
+/* 넓은 화면: 채팅이 있는 옆 패널(대기실·대결 게임·대결 결과)을 화면 아래 끝까지 늘린다.
+   --side-top은 패널 위쪽 위치(화면 여백 + 제목·머리줄 높이) */
+@media (min-width: 1000px) {
+  #screen-online-game { --side-top: 80px; }
+  #screen-online-lobby { --side-top: 85px; }
+  #screen-online-result { --side-top: 77px; }
+  #screen-online-game, #screen-online-lobby, #screen-online-result { padding-bottom: 0; } /* 아래 여백은 body의 24px만 */
+  #screen-online-game .game-side,
+  #screen-online-lobby .col-side,
+  #screen-online-result .col-side {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - var(--side-top) - 24px);
+    min-height: 420px;
+    max-height: none;
+  }
+  .game-side .chat-log, .col-side .chat-log { height: auto; flex: 1; min-height: 160px; }
+  .game-side .scoreboard { flex: none; max-height: 40vh; overflow-y: auto; }
+  #screen-online-lobby .member-list { flex: none; max-height: 34vh; overflow-y: auto; }
+}
 .panel-title + .chat-slot .chat { margin-top: 0; }
 /* 대결 입장 화면은 좁게 */
 #screen-online-entry { max-width: 620px; }
