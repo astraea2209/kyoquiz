@@ -608,7 +608,6 @@ export class OnlineApp {
         { class: 'game-header' },
         el('span', { id: 'on-round-label', class: 'pill' }),
         el('span', { id: 'on-mode-label', class: 'pill muted' }),
-        this.volumeControl(),
         el('span', { id: 'on-score-label', class: 'score' }),
         el('button', { type: 'button', class: 'btn small ghost', id: 'on-quit', text: '나가기', onclick: () => this.leave({ ask: true }) }),
       ),
@@ -649,56 +648,69 @@ export class OnlineApp {
         el('div', { class: 'reaction-layer', id: 'on-reaction-layer', 'aria-hidden': 'true' }),
       ),
       el('div', { class: 'progress', 'aria-label': '남은 시간' }, el('div', { class: 'progress-bar', id: 'on-progress-bar' })),
-      el('p', { class: 'progress-label', id: 'on-progress-label' }),
+      // 영상 바로 아래: 남은 시간과 볼륨
+      el('div', { class: 'stage-meta' }, el('p', { class: 'progress-label', id: 'on-progress-label' }), this.volumeControl()),
       // 매우 어려움: 내가 맞힌 항목. 정답 공개 중에도 보여 준다
       el('ul', { id: 'on-extreme-items', class: 'extreme-items', 'aria-label': '맞힌 항목', hidden: true }),
       el(
         'div',
         { id: 'on-answer-area' },
-        // 힌트·패스 버튼은 개인전처럼 입력칸 위에
+        // 힌트·패스 버튼과 입력칸을 한 줄로(개인전과 같은 배치)
         el(
           'div',
-          { class: 'controls' },
-          el('button', { type: 'button', class: 'btn', id: 'on-hint', text: '초성 힌트 (-50%)', title: '곡 제목(매우 어려움은 가수·작품명도)의 초성을 나에게만 보여 줍니다. 이후 맞히면 점수가 절반', onclick: () => this.requestHint() }),
-          el('button', { type: 'button', class: 'btn ghost', id: 'on-pass', text: '패스 (K)', title: '단축키 K. 입력칸에 있을 때는 Esc를 누른 뒤 K', 'aria-keyshortcuts': 'K', onclick: () => this.session?.pass() }),
+          { class: 'answer-row' },
+          el(
+            'div',
+            { class: 'controls' },
+            el('button', { type: 'button', class: 'btn', id: 'on-hint', text: '초성 힌트 (-50%)', title: '곡 제목(매우 어려움은 가수·작품명도)의 초성을 나에게만 보여 줍니다. 이후 맞히면 점수가 절반', onclick: () => this.requestHint() }),
+            el('button', { type: 'button', class: 'btn ghost', id: 'on-pass', text: '패스 (K)', title: '단축키 K. 입력칸에 있을 때는 Esc를 누른 뒤 K', 'aria-keyshortcuts': 'K', onclick: () => this.session?.pass() }),
+          ),
+          el(
+            'form',
+            { id: 'on-answer-form', class: 'answer-form', autocomplete: 'off', onsubmit: (event) => this.submitAnswer(event) },
+            el('input', { id: 'on-answer-input', type: 'text', enterkeyhint: 'done', placeholder: '곡 제목 또는 작품명', 'aria-label': '정답 입력' }),
+            el('button', { type: 'submit', class: 'btn primary', text: '제출' }),
+          ),
         ),
-        el('p', { class: 'attempts', id: 'on-attempts' }),
         el('div', { class: 'choices', id: 'on-choices' }),
-        el(
-          'form',
-          { id: 'on-answer-form', class: 'answer-form', autocomplete: 'off', onsubmit: (event) => this.submitAnswer(event) },
-          el('input', { id: 'on-answer-input', type: 'text', enterkeyhint: 'done', placeholder: '곡 제목 또는 작품명', 'aria-label': '정답 입력' }),
-          el('button', { type: 'submit', class: 'btn primary', text: '제출' }),
-        ),
-        el('p', { class: 'feedback', id: 'on-feedback', role: 'status' }),
+        el('div', { class: 'answer-meta' }, el('p', { class: 'attempts', id: 'on-attempts' }), el('p', { class: 'feedback', id: 'on-feedback', role: 'status' })),
       ),
       el(
         'div',
         { id: 'on-reveal', class: 'reveal', hidden: true },
-        el('p', { class: 'reveal-result', id: 'on-reveal-result' }),
-        el('h2', { id: 'on-reveal-title' }),
-        el('p', { id: 'on-reveal-anime' }),
-        el('p', { class: 'sub', id: 'on-reveal-stats' }),
-        el('p', { class: 'sub', id: 'on-reveal-excluded' }),
+        // 넓은 화면에서는 왼쪽 곡 정보, 오른쪽 리액션·넘기기
         el(
           'div',
-          { class: 'reactions', role: 'group', 'aria-label': '리액션 보내기' },
-          ...REACTIONS.map((emoji) =>
-            el('button', { type: 'button', class: 'btn reaction-btn', text: emoji, 'aria-label': `${emoji} 보내기`, onclick: () => this.session?.react(emoji) }),
-          ),
+          { class: 'reveal-info' },
+          el('p', { class: 'reveal-result', id: 'on-reveal-result' }),
+          el('h2', { id: 'on-reveal-title' }),
+          el('p', { id: 'on-reveal-anime' }),
+          el('p', { class: 'sub', id: 'on-reveal-stats' }),
+          el('p', { class: 'sub', id: 'on-reveal-excluded' }),
         ),
         el(
           'div',
-          { class: 'reveal-next' },
-          el('p', { class: 'sub', id: 'on-reveal-next', role: 'status' }),
-          el('button', {
-            type: 'button',
-            class: 'btn primary',
-            id: 'on-skip',
-            title: '단축키 K. 모두 누르면 기다리지 않고 바로 넘어가요',
-            'aria-keyshortcuts': 'K',
-            onclick: () => this.session?.skip(),
-          }),
+          { class: 'reveal-actions' },
+          el(
+            'div',
+            { class: 'reactions', role: 'group', 'aria-label': '리액션 보내기' },
+            ...REACTIONS.map((emoji) =>
+              el('button', { type: 'button', class: 'btn reaction-btn', text: emoji, 'aria-label': `${emoji} 보내기`, onclick: () => this.session?.react(emoji) }),
+            ),
+          ),
+          el(
+            'div',
+            { class: 'reveal-next' },
+            el('p', { class: 'sub', id: 'on-reveal-next', role: 'status' }),
+            el('button', {
+              type: 'button',
+              class: 'btn primary',
+              id: 'on-skip',
+              title: '단축키 K. 모두 누르면 기다리지 않고 바로 넘어가요',
+              'aria-keyshortcuts': 'K',
+              onclick: () => this.session?.skip(),
+            }),
+          ),
         ),
       ),
     );
