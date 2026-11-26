@@ -819,7 +819,7 @@
     "id": "kanokari-op1",
     "videoId": "3Eo02oa0GtU",
     "title": "센티미터",
-    "anime": { "name": "여친, 빌리겠습니다", "aliases": ["여친 빌리겠습니다", "여친빌리", "Rent-a-Girlfriend"] },
+    "anime": { "name": "여친, 빌리겠습니다", "aliases": ["여친 빌리겠습니다", "여친빌리", "Rent-a-Girlfriend", "렌탈여친"] },
     "artist": "the peggies",
     "artistAliases": ["더 페기스", "페기스"],
     "type": "OP",
@@ -830,7 +830,7 @@
     "id": "kanokari-op2",
     "videoId": "1TfqHTWCYwE",
     "title": "말할 수 없는 사랑의 마음",
-    "anime": { "name": "여친, 빌리겠습니다", "aliases": ["여친 빌리겠습니다", "여친빌리", "Rent-a-Girlfriend"] },
+    "anime": { "name": "여친, 빌리겠습니다", "aliases": ["여친 빌리겠습니다", "여친빌리", "Rent-a-Girlfriend", "렌탈여친"] },
     "artist": "CHiCO with HoneyWorks",
     "artistAliases": ["치코", "치코 위드 하니웍스", "하니웍스"],
     "type": "OP",
@@ -3133,7 +3133,7 @@
     "id": "kanojo-op1",
     "videoId": "lvbumK8M75E",
     "title": "논시나리오 에튀드",
-    "anime": { "name": "여친, 빌리겠습니다", "aliases": ["여친 빌리겠습니다", "여친빌리", "Rent-a-Girlfriend"] },
+    "anime": { "name": "여친, 빌리겠습니다", "aliases": ["여친 빌리겠습니다", "여친빌리", "Rent-a-Girlfriend", "렌탈여친"] },
     "artist": "아마미야 소라",
     "type": "OP",
     "duration": 90,
@@ -3143,7 +3143,7 @@
     "id": "kanojo-ed1",
     "videoId": "p-iOFxtEUq0",
     "title": "204호실",
-    "anime": { "name": "여친, 빌리겠습니다", "aliases": ["여친 빌리겠습니다", "여친빌리", "Rent-a-Girlfriend"] },
+    "anime": { "name": "여친, 빌리겠습니다", "aliases": ["여친 빌리겠습니다", "여친빌리", "Rent-a-Girlfriend", "렌탈여친"] },
     "artist": "나키고토",
     "type": "ED",
     "duration": 90,
@@ -3154,7 +3154,7 @@
     "videoId": "VOdmjxK8QGQ",
     "title": "우미츠키",
     "titleAliases": ["Umitsuki"],
-    "anime": { "name": "여친, 빌리겠습니다", "aliases": ["여친 빌리겠습니다", "여친빌리", "Rent-a-Girlfriend"] },
+    "anime": { "name": "여친, 빌리겠습니다", "aliases": ["여친 빌리겠습니다", "여친빌리", "Rent-a-Girlfriend", "렌탈여친"] },
     "artist": "ClariS",
     "artistAliases": ["클라리스"],
     "type": "OP",
@@ -3165,7 +3165,7 @@
     "id": "kanojo-ed2",
     "videoId": "4G_FxiIALwo",
     "title": "나의 베가",
-    "anime": { "name": "여친, 빌리겠습니다", "aliases": ["여친 빌리겠습니다", "여친빌리", "Rent-a-Girlfriend"] },
+    "anime": { "name": "여친, 빌리겠습니다", "aliases": ["여친 빌리겠습니다", "여친빌리", "Rent-a-Girlfriend", "렌탈여친"] },
     "artist": "리갈 릴리",
     "type": "ED",
     "duration": 90,
@@ -3175,7 +3175,7 @@
     "id": "kanojo-ed3",
     "videoId": "SHD0VM-auPc",
     "title": "엔딩 크레딧",
-    "anime": { "name": "여친, 빌리겠습니다", "aliases": ["여친 빌리겠습니다", "여친빌리", "Rent-a-Girlfriend"] },
+    "anime": { "name": "여친, 빌리겠습니다", "aliases": ["여친 빌리겠습니다", "여친빌리", "Rent-a-Girlfriend", "렌탈여친"] },
     "artist": "Amber's",
     "artistAliases": ["앰버즈"],
     "type": "ED",
@@ -3186,7 +3186,7 @@
     "id": "kanojo-op3",
     "videoId": "XkOLZUTZRRI",
     "title": "연애mm 필름",
-    "anime": { "name": "여친, 빌리겠습니다", "aliases": ["여친 빌리겠습니다", "여친빌리", "Rent-a-Girlfriend"] },
+    "anime": { "name": "여친, 빌리겠습니다", "aliases": ["여친 빌리겠습니다", "여친빌리", "Rent-a-Girlfriend", "렌탈여친"] },
     "artist": "Halca",
     "artistAliases": ["하루카"],
     "type": "OP",
@@ -3203,6 +3203,7 @@
     "artistAliases": [],
     "type": "삽입곡",
     "hookStart": 25,
+    "duration": 149,
     "enabled": true
   },
   {
@@ -3215,6 +3216,7 @@
     "artistAliases": [],
     "type": "OP",
     "hookStart": 10,
+    "duration": 186,
     "enabled": true
   },
   {
@@ -3226,6 +3228,7 @@
     "artist": "미나세 이노리",
     "artistAliases": ["스야히메"],
     "type": "OP",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3237,6 +3240,7 @@
     "artist": "NACHERRY",
     "artistAliases": ["나체리"],
     "type": "OP",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3248,6 +3252,7 @@
     "artist": "요정제국",
     "artistAliases": [],
     "type": "OP",
+    "duration": 91,
     "enabled": true
   },
   {
@@ -3260,6 +3265,7 @@
     "artistAliases": ["페이란"],
     "type": "ED",
     "hookStart": 0,
+    "duration": 89,
     "enabled": true
   },
   {
@@ -3271,6 +3277,7 @@
     "artist": "7!!",
     "artistAliases": ["세븐웁스"],
     "type": "ED",
+    "duration": 92,
     "enabled": true
   },
   {
@@ -3282,6 +3289,7 @@
     "artist": "페코린느, 콧코로, 캬루",
     "artistAliases": [],
     "type": "OP",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3293,6 +3301,7 @@
     "artist": "Akino and bless4",
     "artistAliases": ["아키노"],
     "type": "OP",
+    "duration": 92,
     "enabled": true
   },
   {
@@ -3304,6 +3313,7 @@
     "artist": "JAM Project",
     "artistAliases": ["잼 프로젝트"],
     "type": "OP",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3315,6 +3325,7 @@
     "artist": "스즈키 마사유키, 스즈키 아이리",
     "artistAliases": [],
     "type": "OP",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3326,6 +3337,7 @@
     "artist": "나카가와 쇼코",
     "artistAliases": [],
     "type": "OST",
+    "duration": 207,
     "enabled": true
   },
   {
@@ -3337,6 +3349,7 @@
     "artist": "서벌, 라쿤, 사막여우",
     "artistAliases": ["동물 비스킷츠"],
     "type": "OP",
+    "duration": 92,
     "enabled": true
   },
   {
@@ -3348,6 +3361,7 @@
     "artist": "사토시",
     "artistAliases": ["마츠모토 리카", "지우"],
     "type": "OP",
+    "duration": 88,
     "enabled": true
   },
   {
@@ -3359,6 +3373,7 @@
     "artist": "이시카와 치아키",
     "artistAliases": [],
     "type": "OP",
+    "duration": 89,
     "enabled": true
   },
   {
@@ -3370,6 +3385,7 @@
     "artist": "냐루코, 쿠우코, 쿠레이 타마오",
     "artistAliases": [],
     "type": "OP",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3382,6 +3398,7 @@
     "artistAliases": [],
     "type": "OP",
     "hookStart": 65,
+    "duration": 249,
     "enabled": true
   },
   {
@@ -3393,6 +3410,7 @@
     "artist": "KOTOKO",
     "artistAliases": ["코토코"],
     "type": "OP",
+    "duration": 84,
     "enabled": true
   },
   {
@@ -3404,6 +3422,7 @@
     "artist": "호리에 유이",
     "artistAliases": [],
     "type": "OP",
+    "duration": 91,
     "enabled": true
   },
   {
@@ -3415,6 +3434,7 @@
     "artist": "마법당",
     "artistAliases": [],
     "type": "OP",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3426,6 +3446,7 @@
     "artist": "미즈키 나나",
     "artistAliases": ["미즈키나나"],
     "type": "OP",
+    "duration": 95,
     "enabled": true
   },
   {
@@ -3437,6 +3458,7 @@
     "artist": "엘렌 조",
     "artistAliases": [],
     "type": "기타",
+    "duration": 157,
     "enabled": true
   },
   {
@@ -3449,6 +3471,7 @@
     "artistAliases": ["코초"],
     "type": "OP",
     "hookStart": 80,
+    "duration": 212,
     "enabled": true
   },
   {
@@ -3460,6 +3483,7 @@
     "artist": "Aimer",
     "artistAliases": ["에메"],
     "type": "ED",
+    "duration": 277,
     "enabled": true
   },
   {
@@ -3471,6 +3495,7 @@
     "artist": "SawanoHiroyuki[nZk]",
     "artistAliases": ["사와노 히로유키", "Honoka Takahashi"],
     "type": "삽입곡",
+    "duration": 263,
     "enabled": true
   },
   {
@@ -3482,6 +3507,7 @@
     "artist": "Reona",
     "artistAliases": ["레오나"],
     "type": "OP",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3493,6 +3519,7 @@
     "artist": "GARNiDELiA",
     "artistAliases": ["가르니델리아"],
     "type": "OP",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3504,6 +3531,7 @@
     "artist": "타마모 크로스, 오구리 캡, 이나리 원, 슈퍼 크릭",
     "artistAliases": [],
     "type": "기타",
+    "duration": 145,
     "enabled": true
   },
   {
@@ -3516,6 +3544,7 @@
     "artistAliases": ["로우바이"],
     "type": "OP",
     "hookStart": 0,
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3527,6 +3556,7 @@
     "artist": "후지카와 치아이",
     "artistAliases": [],
     "type": "ED",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3538,6 +3568,7 @@
     "artist": "Suara",
     "artistAliases": ["수아라"],
     "type": "OP",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3549,6 +3580,7 @@
     "artist": "Suara",
     "artistAliases": ["수아라"],
     "type": "OP",
+    "duration": 91,
     "enabled": true
   },
   {
@@ -3560,6 +3592,7 @@
     "artist": "호리에 유이",
     "artistAliases": [],
     "type": "OP",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3571,6 +3604,7 @@
     "artist": "supercell",
     "artistAliases": ["슈퍼셀"],
     "type": "OP",
+    "duration": 89,
     "enabled": true
   },
   {
@@ -3582,6 +3616,7 @@
     "artist": "네코칸",
     "artistAliases": [],
     "type": "ED",
+    "duration": 92,
     "enabled": true
   },
   {
@@ -3593,6 +3628,7 @@
     "artist": "KOTOKO",
     "artistAliases": ["코토코"],
     "type": "OP",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3604,6 +3640,7 @@
     "artist": "치하라 미노리",
     "artistAliases": ["미노리"],
     "type": "OP",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3615,6 +3652,7 @@
     "artist": "ALTIMA",
     "artistAliases": ["알티마"],
     "type": "OP",
+    "duration": 91,
     "enabled": true
   },
   {
@@ -3627,6 +3665,7 @@
     "artistAliases": [],
     "type": "OP",
     "hookStart": 5,
+    "duration": 98,
     "enabled": true
   },
   {
@@ -3638,6 +3677,7 @@
     "artist": "Ray",
     "artistAliases": ["레이"],
     "type": "OP",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3649,6 +3689,7 @@
     "artist": "TRUE",
     "artistAliases": ["트루"],
     "type": "OP",
+    "duration": 91,
     "enabled": true
   },
   {
@@ -3660,6 +3701,7 @@
     "artist": "오오하시 아야카",
     "artistAliases": [],
     "type": "OP",
+    "duration": 88,
     "enabled": true
   }
 ]
