@@ -683,3 +683,98 @@ test('공개·결과 기록에 들었던 구간 시작(segmentStart)', () => {
   assert.equal(env.room.history[0].segmentStart, start);
   assert.ok(start > 0);
 });
+
+// ---------- 곡별 정답률(매우 어려움) ----------
+function fakeStats(initial = {}) {
+  const store = new Map(Object.entries(initial));
+  const calls = { get: [], add: [] };
+  return {
+    store,
+    calls,
+    async get(videoId) {
+      calls.get.push(videoId);
+      return store.get(videoId) ?? null;
+    },
+    async add(videoId, delta) {
+      calls.add.push([videoId, delta]);
+    },
+  };
+}
+
+function statsEnv(stats) {
+  const songs = Array.from({ length: 6 }, (_, i) => makeSong(i + 1, { duration: 200, artist: `Singer Name ${i + 1}` }));
+  const env = createEnv({ songs, stats });
+  env.joinAll('a', 'b', 'c');
+  env.send('a', { type: 'settings', settings: { difficulty: 'extreme' } });
+  return env;
+}
+
+const tick = () => new Promise((resolve) => setImmediate(resolve));
+
+test('정답률: 공개 때 지금까지 기록에 이번 라운드를 더해 싣고 저장소에 이번 라운드만 더한다', async () => {
+  const stats = fakeStats();
+  const env = statsEnv(stats);
+  env.room.handleMessage('a', { type: 'start' });
+  const song = env.round().song;
+  stats.store.set(song.videoId, { players: 2, complete: 1, hint: 0, items: { title: 2, artist: 1, anime: 1 } });
+  await tick(); // 준비 단계에서 읽어 둔다
+  assert.deepEqual(stats.calls.get, [song.videoId]);
+  env.readyAll();
+  env.timers.advance(env.room.config.goLeadMs);
+
+  env.answer('a', song.title);
+  env.timers.advance(1000);
+  env.answer('a', song.artist);
+  env.timers.advance(1000);
+  env.answer('a', song.anime.name); // a: 전부
+  env.room.handleMessage('b', { type: 'hint', roundId: env.round().id });
+  env.answer('b', song.anime.name); // b: 작품명만, 힌트
+  env.passRest(); // c: 하나도 못 맞히고 패스
+
+  const reveal = env.last('c', 'reveal');
+  assert.deepEqual(reveal.stats, { players: 5, complete: 2, hint: 1, items: { title: 3, artist: 2, anime: 3 } });
+  await tick();
+  assert.deepEqual(stats.calls.add, [[song.videoId, { players: 3, complete: 1, hint: 1, items: { title: 1, artist: 1, anime: 2 } }]]);
+  assert.equal(env.room.history[0].stats, undefined, '결과 기록에는 넣지 않는다');
+});
+
+test('정답률: 처음 나온 곡은 이번 라운드만, 제외된 사람은 세지 않는다', async () => {
+  const stats = fakeStats();
+  const env = statsEnv(stats);
+  env.room.handleMessage('a', { type: 'start' });
+  await tick();
+  env.room.handleMessage('c', { type: 'playerError', roundId: env.round().id, code: 150 });
+  env.readyAll();
+  env.timers.advance(env.room.config.goLeadMs);
+  env.answer('b', env.round().song.title);
+  env.passRest();
+  assert.deepEqual(env.last('a', 'reveal').stats, { players: 2, complete: 0, hint: 0, items: { title: 1, artist: 0, anime: 0 } });
+});
+
+test('정답률: 기록을 못 읽었으면 공개에 싣지 않고, 저장소 오류에도 게임은 계속된다', async () => {
+  const env = statsEnv({
+    get: () => Promise.reject(new Error('down')),
+    add: () => {
+      throw new Error('down');
+    },
+  });
+  env.begin();
+  await tick();
+  env.passRest();
+  await tick();
+  const reveal = env.last('a', 'reveal');
+  assert.equal(reveal.stats, undefined);
+  assert.equal(env.room.phase, 'revealed');
+});
+
+test('정답률: 매우 어려움이 아니면 읽지도 기록하지도 않는다', async () => {
+  const stats = fakeStats();
+  const env = createEnv({ stats });
+  env.joinAll('a', 'b');
+  env.begin();
+  await tick();
+  env.passRest();
+  await tick();
+  assert.deepEqual(stats.calls, { get: [], add: [] });
+  assert.equal(env.last('a', 'reveal').stats, undefined);
+});

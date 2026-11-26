@@ -273,6 +273,7 @@ fieldset:disabled label:hover input:not(:checked) + span { border-color: #2f3445
 .extreme-items .item-label { flex: none; width: 3.5em; color: var(--muted); font-size: 0.9rem; }
 .extreme-items .item-value { flex: 1; min-width: 0; overflow-wrap: anywhere; color: var(--muted); }
 .extreme-items .item-points { flex: none; font-weight: 700; color: var(--ok); }
+.extreme-items .item-rate { flex: none; font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
 .extreme-items li.solved { border-color: var(--ok); }
 .extreme-items li.solved .item-value { color: var(--text); font-weight: 600; }
 .extreme-items li.missed .item-value { color: var(--bad); }
