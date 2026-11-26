@@ -36,6 +36,7 @@ const app = new App({
   storage,
   durationCache: new DurationCache(storage),
   highScores: new HighScores(storage),
+  volume,
 });
 app.init();
 

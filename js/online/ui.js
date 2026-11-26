@@ -153,22 +153,26 @@ export class OnlineApp {
     );
     this.bindEntry();
     this.chat = this.buildChat();
-    // 패스 단축키 K(입력칸 밖에서), Esc로 입력칸 빠져나오기
+    // 단축키: K = 패스(정답 공개 중에는 넘기기 투표), Esc = 입력칸 빠져나오기, ↑↓ = 볼륨
     document.addEventListener('keydown', (event) => {
       if (this.app.screen !== 'online-game' || !this.session) return;
-      handleGameKey(event, { pass: () => !$('#on-pass').disabled && !!this.session?.pass() });
+      handleGameKey(event, {
+        pass: () => !$('#on-pass').disabled && !!this.session?.pass(),
+        next: () => !$('#on-skip').disabled && !!this.session?.skip(),
+        volume: this.volume ? (delta) => this.volume.set(this.volume.value + delta) : null,
+      });
     });
   }
 
   /** 볼륨 슬라이더. 개인전 화면과 같은 VolumeControl을 공유한다 */
   volumeRow() {
-    const input = el('input', { type: 'range', min: '0', max: '100', step: '1', 'data-volume': true, 'aria-label': '노래 볼륨' });
+    const input = el('input', { type: 'range', min: '0', max: '100', step: '1', 'data-volume': true, 'aria-label': '노래 볼륨', 'aria-keyshortcuts': 'ArrowUp ArrowDown' });
     const value = el('span', { class: 'volume-value', 'aria-hidden': 'true' });
     if (this.volume) bindVolumeInput(this.volume, input, value);
     return el(
       'div',
       { class: 'volume-row' },
-      el('label', { class: 'volume-control' }, el('span', { class: 'volume-label', text: '볼륨' }), input, value),
+      el('label', { class: 'volume-control', title: '게임 중 ↑↓ 키로도 조절' }, el('span', { class: 'volume-label', text: '볼륨' }), input, value),
     );
   }
 
@@ -652,7 +656,8 @@ export class OnlineApp {
             type: 'button',
             class: 'btn primary',
             id: 'on-skip',
-            title: '모두 누르면 기다리지 않고 바로 넘어가요',
+            title: '단축키 K. 모두 누르면 기다리지 않고 바로 넘어가요',
+            'aria-keyshortcuts': 'K',
             onclick: () => this.session?.skip(),
           }),
         ),
@@ -883,7 +888,7 @@ export class OnlineApp {
       const { votes, total, mine } = s.skipVotes();
       const skip = $('#on-skip');
       skip.disabled = mine;
-      skip.textContent = `${mine ? '모두 기다리는 중' : r.hasNext ? '다음으로' : '결과 보기'} (${votes}/${total})`;
+      skip.textContent = mine ? `모두 기다리는 중 (${votes}/${total})` : `${r.hasNext ? '다음으로' : '결과 보기'} (K) · ${votes}/${total}`;
       // 공개되는 순간 넘기기 버튼에 포커스(Enter로 투표). 채팅을 쓰는 중이면 뺏지 않는다
       if (this.revealFocusedRound !== r.roundId) {
         this.revealFocusedRound = r.roundId;

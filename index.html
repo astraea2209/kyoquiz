@@ -97,9 +97,9 @@
         <button type="button" class="btn small ghost" id="quit-btn">그만하기</button>
       </div>
       <div class="volume-row">
-        <label class="volume-control">
+        <label class="volume-control" title="게임 중 ↑↓ 키로도 조절">
           <span class="volume-label">볼륨</span>
-          <input type="range" min="0" max="100" step="1" data-volume aria-label="노래 볼륨" />
+          <input type="range" min="0" max="100" step="1" data-volume aria-label="노래 볼륨" aria-keyshortcuts="ArrowUp ArrowDown" />
           <span class="volume-value" aria-hidden="true"></span>
         </label>
       </div>
@@ -149,7 +149,7 @@
         <p class="reveal-result" id="reveal-result"></p>
         <h2 id="reveal-title"></h2>
         <p id="reveal-anime"></p>
-        <button type="button" class="btn primary big" id="next-btn">다음 곡</button>
+        <button type="button" class="btn primary big" id="next-btn" title="단축키 K 또는 Enter" aria-keyshortcuts="K">다음 곡 (K)</button>
       </div>
     </section>
 

@@ -69,7 +69,8 @@ function songLink(title, videoId, startSeconds) {
 }
 
 export class App {
-  constructor({ store, durationCache, highScores, storage }) {
+  constructor({ store, durationCache, highScores, storage, volume = null }) {
+    this.volume = volume; // 노래 볼륨(↑↓ 단축키)
     this.store = store;
     this.durationCache = durationCache;
     this.highScores = highScores;
@@ -245,16 +246,18 @@ export class App {
       // 힌트를 보고 바로 입력할 수 있게 입력칸으로 돌아간다
       if (this.game?.useHint()) this.focusAnswer();
     });
-    // 패스 단축키 K(입력칸 밖에서), Esc로 입력칸 빠져나오기
+    // 단축키: K = 패스(정답 공개 중에는 다음 곡), Esc = 입력칸 빠져나오기, ↑↓ = 볼륨
+    const clickIfEnabled = (btn) => {
+      if (btn.hidden || btn.disabled || btn.closest('[hidden]')) return false;
+      btn.click();
+      return true;
+    };
     document.addEventListener('keydown', (event) => {
       if (this.screen !== 'game' || !this.game) return;
       handleGameKey(event, {
-        pass: () => {
-          const btn = $('#pass-btn');
-          if (btn.hidden || btn.disabled) return false;
-          btn.click();
-          return true;
-        },
+        pass: () => clickIfEnabled($('#pass-btn')),
+        next: () => clickIfEnabled($('#next-btn')),
+        volume: this.volume ? (delta) => this.volume.set(this.volume.value + delta) : null,
       });
     });
     $('#next-btn').addEventListener('click', () => this.game?.next());
@@ -443,7 +446,7 @@ export class App {
         ...(round.song.artist ? [el('span', { class: 'reveal-artist', text: ` / ${round.song.artist}` })] : []),
       );
       $('#reveal-anime').textContent = [round.song.anime?.name, round.song.type].filter(Boolean).join(' · ');
-      $('#next-btn').textContent = game.hasNext ? '다음 곡' : '결과 보기';
+      $('#next-btn').textContent = game.hasNext ? '다음 곡 (K)' : '결과 보기 (K)';
       // 공개되면 Enter로 바로 다음 곡으로 넘어갈 수 있게
       if (!this.revealWasShown) $('#next-btn').focus();
     }
