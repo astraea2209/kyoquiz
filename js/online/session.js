@@ -3,6 +3,7 @@
 // isPlayerVisible …)을 주입받는다(테스트에서는 가짜).
 
 import { SCORING } from '../scoring.js';
+import { REACTION_COOLDOWN_MS, isReaction } from './reactions.js';
 
 // 플레이어 색(채팅 이름·참가자·순위판). 방 안 입장 순서(p1, p2, …)로 정해 최대 인원 8명이 모두 다르다
 export const PLAYER_COLORS = Object.freeze(['#6c8cff', '#3ecf8e', '#ffb84d', '#ff7eb6', '#4dd0e1', '#b892ff', '#ff8a65', '#c6e05a']);
@@ -52,7 +53,9 @@ export class OnlineSession {
     this.chatVersion = 0; // 채팅 목록이 바뀔 때마다 1씩 늘어난다(화면이 다시 그릴지 판단)
     this.chatBlocked = null; // 방금 막힌 내 채팅 {reason: 'answer'|'rate', at}
     this.lastChatSentAt = null;
-    this.listeners = { change: new Set(), notice: new Set(), error: new Set() };
+    this.skipRequested = false; // 이번 공개에서 넘기기를 눌렀는지(서버 state가 오기 전에도 버튼을 잠그려고)
+    this.lastReactionAt = null;
+    this.listeners = { change: new Set(), notice: new Set(), error: new Set(), reaction: new Set() };
 
     this.offMessage = connection.on('message', (m) => this.handle(m));
     this.offStatus = connection.on('status', () => this.emit('change'));
@@ -148,6 +151,10 @@ export class OnlineSession {
         this.chatBlocked = { reason: message.reason, at: this.clock.serverNow() };
         this.chatVersion++;
         break;
+      case 'reaction':
+        // 화면에 잠깐 띄우고 마는 것이라 상태에 쌓지 않고 이벤트로만 넘긴다
+        if (isReaction(message.emoji)) this.emit('reaction', { playerId: message.playerId, emoji: message.emoji });
+        return;
       case 'kicked':
         this.kicked = true;
         this.playback.stop();
@@ -172,6 +179,7 @@ export class OnlineSession {
     this.lastChoice = null;
     this.hint = null;
     this.hintRequested = false;
+    this.skipRequested = false;
   }
 
   addChat(list) {
@@ -241,6 +249,19 @@ export class OnlineSession {
     return Math.min(1, Math.max(0, elapsed / total));
   }
 
+  /** 정답 공개가 끝나 다음 라운드(또는 결과)로 넘어갈 때까지 남은 초(공개 중이 아니면 null) */
+  revealSecondsLeft() {
+    if (!this.reveal || this.phase !== 'revealed' || !Number.isFinite(this.reveal.nextAt)) return null;
+    return Math.max(0, (this.reveal.nextAt - this.clock.serverNow()) / 1000);
+  }
+
+  /** 넘기기 투표 현황: 투표한 사람 수 / 접속한 사람 수, 내가 투표했는지 */
+  skipVotes() {
+    const players = (this.room?.players ?? []).filter((p) => p.connected && !p.left);
+    const mine = this.skipRequested || !!this.me?.skip;
+    return { votes: players.filter((p) => p.skip || (p.id === this.you && mine)).length, total: players.length, mine };
+  }
+
   /** 준비를 마친 사람 수 / 이번 라운드 참가자 수 */
   readyCount() {
     const players = this.room?.players ?? [];
@@ -290,6 +311,28 @@ export class OnlineSession {
     return this.send({ type: 'pass', roundId: this.round.roundId });
   }
 
+  /** 정답 공개 중 넘기기 투표(전원이 누르면 바로 다음 라운드) */
+  skip() {
+    if (this.phase !== 'revealed' || !this.reveal || this.skipVotes().mine) return false;
+    if (!this.send({ type: 'skip', roundId: this.reveal.roundId })) return false;
+    this.skipRequested = true;
+    this.emit('change');
+    return true;
+  }
+
+  /**
+   * 정답 공개 중 이모지 리액션. 너무 빨리 누르면 보내지 않는다(서버도 같은 간격으로 버린다).
+   * @returns {boolean} 보냈는지
+   */
+  react(emoji) {
+    if (this.phase !== 'revealed' || !isReaction(emoji)) return false;
+    const now = this.clock.serverNow();
+    if (this.lastReactionAt != null && now - this.lastReactionAt < REACTION_COOLDOWN_MS) return false;
+    if (!this.send({ type: 'react', emoji })) return false;
+    this.lastReactionAt = now;
+    return true;
+  }
+
   /**
    * 채팅 보내기. 빈 글이거나 너무 빨리 보내면 보내지 않는다(서버도 같은 한도로 검사).
    * @returns {'sent'|'empty'|'rate'|false}  false: 연결이 없어 못 보냄
@@ -317,5 +360,6 @@ export class OnlineSession {
     this.listeners.change.clear();
     this.listeners.notice.clear();
     this.listeners.error.clear();
+    this.listeners.reaction.clear();
   }
 }

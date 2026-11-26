@@ -73,12 +73,12 @@ test('설정: 방장만, 값 검증, 부분 변경', () => {
   assert.equal(env.state().settings.rounds, 10);
 
   env.send('a', { type: 'settings', settings: { rounds: 5, clipLength: 3, answerTime: 20 } });
-  assert.deepEqual(env.state().settings, { mode: 'random', rounds: 5, clipLength: 3, difficulty: 'normal', answerTime: 20 });
+  assert.deepEqual(env.state().settings, { mode: 'random', rounds: 5, clipLength: 3, difficulty: 'normal', answerTime: 20, fullTime: 30, revealTime: 10 });
   env.send('a', { type: 'settings', settings: { mode: 'full', difficulty: 'hard' } });
   assert.equal(env.state().settings.mode, 'full');
   assert.equal(env.state().settings.rounds, 5);
 
-  for (const bad of [{ rounds: 0 }, { rounds: 101 }, { rounds: 7.5 }, { rounds: '10' }, { clipLength: 4 }, { answerTime: 12 }, { mode: 'x' }, { difficulty: 'insane' }]) {
+  for (const bad of [{ rounds: 0 }, { rounds: 101 }, { rounds: 7.5 }, { rounds: '10' }, { clipLength: 4 }, { answerTime: 12 }, { fullTime: 20 }, { revealTime: 0 }, { revealTime: '10' }, { mode: 'x' }, { difficulty: 'insane' }]) {
     env.send('a', { type: 'settings', settings: bad });
     assert.equal(env.last('a', 'error').code, 'bad-settings');
   }
@@ -86,6 +86,10 @@ test('설정: 방장만, 값 검증, 부분 변경', () => {
   // 라운드 수는 1~100 정수면 직접 정할 수 있고, 구간 15초도 된다
   env.send('a', { type: 'settings', settings: { rounds: 37, clipLength: 15 } });
   assert.deepEqual([env.state().settings.rounds, env.state().settings.clipLength], [37, 15]);
+  // 답변 시간(5~30초), 전체듣기 제한 시간, 정답 공개 시간
+  env.send('a', { type: 'settings', settings: { answerTime: 5, fullTime: 60, revealTime: 30 } });
+  const s = env.state().settings;
+  assert.deepEqual([s.answerTime, s.fullTime, s.revealTime], [5, 60, 30]);
 });
 
 test('시작: 방장만, 2명 이상', () => {
@@ -126,7 +130,7 @@ test('게임 중에도 새로 입장: 진행 중인 라운드는 쉬고 다음 �
   assert.equal(env.state().phase, ROOM_PHASE.REVEALED);
   assert.equal(env.msgs('c', 'reveal').length, 1, '공개는 같이 본다');
 
-  env.timers.advance(env.room.config.revealMs);
+  env.timers.advance(env.room.revealMs);
   assert.equal(env.msgs('c', 'prepare').length, 1);
   assert.equal(env.state().players.find((p) => p.id === joined.playerId).status, 'preparing');
   env.readyAll();
@@ -151,7 +155,7 @@ test('정답 공개 중에 들어오면 다음 라운드부터 함께', () => {
   assert.equal(env.state().phase, ROOM_PHASE.REVEALED);
   env.join('c', 'c');
   assert.equal(env.msgs('c', 'reveal').length, 0);
-  env.timers.advance(env.room.config.revealMs);
+  env.timers.advance(env.room.revealMs);
   assert.equal(env.msgs('c', 'prepare').length, 1);
 });
 
@@ -162,12 +166,12 @@ test('게임 중에 들어온 사람도 최종 순위에 들어간다', () => {
   env.begin();
   env.join('c', 'c');
   env.passRest();
-  env.timers.advance(env.room.config.revealMs);
+  env.timers.advance(env.room.revealMs);
   env.readyAll();
   env.timers.advance(env.room.config.goLeadMs);
   env.answer('c', env.correctText());
   env.passRest();
-  env.timers.advance(env.room.config.revealMs);
+  env.timers.advance(env.room.revealMs);
   const over = env.last('c', 'gameOver');
   assert.equal(over.reason, 'complete');
   assert.equal(over.ranking[0].nickname, 'c');
@@ -221,7 +225,7 @@ test('재접속 토큰: 점수를 유지하고 진행 중인 라운드는 쉬고
   assert.equal(env.state().players[0].score, aScore);
   assert.equal(env.msgs('b2', 'prepare').length, 0, '진행 중인 라운드에는 끼지 않는다');
 
-  env.timers.advance(env.room.config.revealMs); // 공개 → 다음 라운드 준비
+  env.timers.advance(env.room.revealMs); // 공개 → 다음 라운드 준비
   assert.equal(env.msgs('b2', 'prepare').length, 1);
   assert.equal(env.state().players[1].status, 'preparing');
 });
@@ -320,7 +324,7 @@ test('남은 사람이 1명이면 현재 라운드를 마치고 결과 화면', 
   env.answer('a', env.correctText());
   assert.equal(env.state().phase, ROOM_PHASE.REVEALED);
   assert.equal(env.last('a', 'reveal').hasNext, false);
-  env.timers.advance(env.room.config.revealMs);
+  env.timers.advance(env.room.revealMs);
   assert.equal(env.state().phase, ROOM_PHASE.RESULTS);
   assert.equal(env.last('a', 'gameOver').reason, 'not-enough-players');
 });
@@ -347,7 +351,7 @@ test('끝까지 진행: 순위·라운드별 기록, 방장이 같은 멤버로 
     env.timers.advance(3000 + 2000);
     env.answer(w, env.correctText());
     env.passRest();
-    env.timers.advance(env.room.config.revealMs);
+    env.timers.advance(env.room.revealMs);
   }
   assert.equal(env.state().phase, ROOM_PHASE.RESULTS);
   const over = env.last('b', 'gameOver');
@@ -381,7 +385,7 @@ test('다시 시작 전에 나간 사람은 정리된다', () => {
     }
     env.answer('a', env.correctText());
     env.passRest();
-    env.timers.advance(env.room.config.revealMs);
+    env.timers.advance(env.room.revealMs);
   }
   assert.equal(env.state().phase, ROOM_PHASE.RESULTS);
   assert.equal(env.last('a', 'gameOver').ranking.find((r) => r.nickname === 'c').left, true);

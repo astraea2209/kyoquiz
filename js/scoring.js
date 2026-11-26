@@ -20,8 +20,12 @@ export const SCORING = Object.freeze({
   // 멀티플레이(친구와 대결, 맞힌 사람 모두 속도 점수). 숫자는 초안이므로 플레이 테스트 뒤 여기만 고친다.
   multi: Object.freeze({
     speedBonusMax: 0.5, // 랜덤듣기: 기본 점수의 최대 +50%
-    answerTimes: Object.freeze([10, 15, 20]), // 구간이 끝난 뒤 답변 시간(초)
+    answerTimes: Object.freeze([5, 10, 15, 20, 30]), // 랜덤듣기: 구간이 끝난 뒤 답변 시간(초)
     defaultAnswerTime: 15,
+    fullTimes: Object.freeze([15, 30, 45, 60]), // 전체듣기: 제한 시간(초)
+    defaultFullTime: 30,
+    revealTimes: Object.freeze([5, 10, 15, 20, 30]), // 정답 공개 시간(초). 전원이 넘기기에 투표하면 더 일찍 끝난다
+    defaultRevealTime: 10,
     minPlayers: 2,
     maxPlayers: 8,
   }),
@@ -98,10 +102,10 @@ export function scoreExtremeBonus(base, cfg = SCORING.extreme) {
 
 /**
  * 멀티플레이 답변 창(초). 시작 신호 뒤 이 시간 안에 맞혀야 한다.
- * 랜덤듣기: 구간 길이 + 답변 제한시간, 전체듣기: 전체듣기 제한시간.
+ * 랜덤듣기: 구간 길이 + 답변 제한시간, 전체듣기: 방에서 정한 제한 시간(기본 30초).
  */
-export function answerWindow({ mode, clipLength, answerTime = SCORING.multi.defaultAnswerTime }) {
-  return mode === 'full' ? SCORING.full.timeLimit : clipLength + answerTime;
+export function answerWindow({ mode, clipLength, answerTime = SCORING.multi.defaultAnswerTime, fullTime = SCORING.multi.defaultFullTime }) {
+  return mode === 'full' ? fullTime : clipLength + answerTime;
 }
 
 /**
@@ -115,12 +119,12 @@ export function scoreMultiRandom({ clipLength, elapsed, answerTime = SCORING.mul
   return Math.round(base * (1 + cfg.speedBonusMax * left));
 }
 
-/** 멀티플레이 전체듣기 정답 점수: 개인전과 같다(감소 공식이 이미 속도를 반영). */
+/** 멀티플레이 전체듣기 정답 점수: 개인전과 같다(감소 공식이 이미 속도를 반영). 제한 시간 동안 100점 → 20점 */
 export function scoreMultiFull({ elapsed, timeLimit = SCORING.full.timeLimit }) {
   return scoreFull({ elapsed, timeLimit });
 }
 
 /** 모드에 맞는 멀티플레이 정답 점수 */
-export function scoreMulti({ mode, clipLength, elapsed, answerTime }) {
-  return mode === 'full' ? scoreMultiFull({ elapsed }) : scoreMultiRandom({ clipLength, elapsed, answerTime });
+export function scoreMulti({ mode, clipLength, elapsed, answerTime, fullTime = SCORING.multi.defaultFullTime }) {
+  return mode === 'full' ? scoreMultiFull({ elapsed, timeLimit: fullTime }) : scoreMultiRandom({ clipLength, elapsed, answerTime });
 }

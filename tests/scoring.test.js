@@ -59,11 +59,25 @@ test('답변 창 길이', () => {
   assert.equal(answerWindow({ mode: 'random', clipLength: 5, answerTime: 15 }), 20);
   assert.equal(answerWindow({ mode: 'random', clipLength: 3, answerTime: 10 }), 13);
   assert.equal(answerWindow({ mode: 'full', clipLength: 5, answerTime: 20 }), 30);
+  // 전체듣기 제한 시간은 방에서 정한다
+  assert.equal(answerWindow({ mode: 'full', clipLength: 5, answerTime: 20, fullTime: 60 }), 60);
+});
+
+test('전체듣기 멀티 점수: 방에서 정한 제한 시간 동안 100 → 20점', () => {
+  assert.equal(scoreMulti({ mode: 'full', elapsed: 0, fullTime: 60 }), 100);
+  assert.equal(scoreMulti({ mode: 'full', elapsed: 30, fullTime: 60 }), 60);
+  assert.equal(scoreMulti({ mode: 'full', elapsed: 60, fullTime: 60 }), 20);
+  assert.equal(scoreMulti({ mode: 'full', elapsed: 15, fullTime: 15 }), 20);
+  assert.equal(scoreMulti({ mode: 'full', elapsed: 15 }), 60); // 기본 30초
 });
 
 test('SCORING.multi 상수', () => {
-  assert.deepEqual([...SCORING.multi.answerTimes], [10, 15, 20]);
+  assert.deepEqual([...SCORING.multi.answerTimes], [5, 10, 15, 20, 30]);
   assert.equal(SCORING.multi.defaultAnswerTime, 15);
+  assert.deepEqual([...SCORING.multi.fullTimes], [15, 30, 45, 60]);
+  assert.equal(SCORING.multi.defaultFullTime, SCORING.full.timeLimit);
+  assert.deepEqual([...SCORING.multi.revealTimes], [5, 10, 15, 20, 30]);
+  assert.equal(SCORING.multi.defaultRevealTime, 10);
   assert.equal(SCORING.multi.speedBonusMax, 0.5);
 });
 
