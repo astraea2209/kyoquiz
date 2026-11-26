@@ -3124,6 +3124,7 @@
     "anime": { "name": "여친, 빌리겠습니다" },
     "artist": "아마미야 소라",
     "type": "OP",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3133,6 +3134,7 @@
     "anime": { "name": "여친, 빌리겠습니다" },
     "artist": "나키고토",
     "type": "ED",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3143,6 +3145,7 @@
     "anime": { "name": "여친, 빌리겠습니다" },
     "artist": "ClariS",
     "type": "OP",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3152,6 +3155,7 @@
     "anime": { "name": "여친, 빌리겠습니다" },
     "artist": "리갈 릴리",
     "type": "ED",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3162,6 +3166,7 @@
     "artist": "Amber's",
     "artistAliases": ["앰버즈"],
     "type": "ED",
+    "duration": 254,
     "enabled": true
   }
 ]
