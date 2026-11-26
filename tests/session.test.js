@@ -269,3 +269,54 @@ test('매우 어려움: 일부 맞힘·이미 맞힘·전부 맞힘', () => {
   env.receive({ type: 'prepare', roundId: 4, index: 1, total: 5, mode: 'random', videoId: 'w', segmentStart: 1, clipLength: 5, choices: null, items: null, attempts: 3 });
   assert.deepEqual([s.maxAttempts, s.attemptsLeft, s.solved.size, s.lastGain], [3, 3, 0, null]);
 });
+
+/** 3라운드 정답 공개 상태까지(nextAt: 지금부터 10초 뒤) */
+function inReveal(env, players = [player('p1', { skip: false }), player('p2', { skip: false })]) {
+  inRound(env);
+  env.receive({ type: 'reveal', roundId: 3, correctPlayers: [], song: { title: 'T' }, hasNext: true, nextAt: env.now() + 10_000 });
+  env.receive(roomState('revealed', players));
+}
+
+test('정답 공개: 다음 라운드까지 남은 초', () => {
+  const env = setup();
+  inReveal(env);
+  assert.equal(env.session.revealSecondsLeft(), 10);
+  env.setNow(env.now() + 7500);
+  assert.equal(env.session.revealSecondsLeft(), 2.5);
+  env.setNow(env.now() + 5000);
+  assert.equal(env.session.revealSecondsLeft(), 0);
+});
+
+test('넘기기 투표: 한 번만 보내고 투표 현황에 바로 반영', () => {
+  const env = setup();
+  inRound(env);
+  assert.equal(env.session.skip(), false); // 공개 전에는 안 됨
+  inReveal(env, [player('p1', { skip: true }), player('p2', { skip: false }), player('p3', { skip: false, connected: false })]);
+  assert.deepEqual(env.session.skipVotes(), { votes: 1, total: 2, mine: false });
+  assert.equal(env.session.skip(), true);
+  assert.deepEqual(env.sent.at(-1), { type: 'skip', roundId: 3 });
+  assert.deepEqual(env.session.skipVotes(), { votes: 2, total: 2, mine: true }); // 서버 state 전에도 내 표가 보인다
+  assert.equal(env.session.skip(), false);
+  assert.equal(env.sent.filter((m) => m.type === 'skip').length, 1);
+  // 다음 라운드가 오면 다시 투표할 수 있다
+  env.receive({ type: 'prepare', roundId: 4, index: 1, total: 5, mode: 'random', videoId: 'w', segmentStart: 0, clipLength: 5, answerWindow: 20, choices: null });
+  assert.equal(env.session.skipRequested, false);
+});
+
+test('리액션: 공개 중에만, 목록의 이모지만, 간격을 두고 보낸다. 받은 리액션은 이벤트로', () => {
+  const env = setup();
+  const got = [];
+  env.session.on('reaction', (r) => got.push(r));
+  inRound(env);
+  assert.equal(env.session.react('👍'), false);
+  inReveal(env);
+  assert.equal(env.session.react('💩'), false);
+  assert.equal(env.session.react('👍'), true);
+  assert.equal(env.session.react('😂'), false); // 너무 빠름
+  env.setNow(env.now() + 400);
+  assert.equal(env.session.react('😂'), true);
+  assert.deepEqual(env.sent.filter((m) => m.type === 'react').map((m) => m.emoji), ['👍', '😂']);
+  env.receive({ type: 'reaction', playerId: 'p1', emoji: '🔥', at: 1 });
+  env.receive({ type: 'reaction', playerId: 'p1', emoji: '<script>', at: 2 });
+  assert.deepEqual(got, [{ playerId: 'p1', emoji: '🔥' }]);
+});

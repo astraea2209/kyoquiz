@@ -156,7 +156,7 @@ test('대결 힌트: 다음 라운드에는 초기화', () => {
   env.begin();
   env.send('a', { type: 'hint', roundId: env.round().id });
   env.passRest();
-  env.timers.advance(env.room.config.revealMs);
+  env.timers.advance(env.room.revealMs);
   env.readyAll();
   env.timers.advance(env.room.config.goLeadMs);
   assert.deepEqual(env.state().players.map((p) => p.hint), [false, false]);

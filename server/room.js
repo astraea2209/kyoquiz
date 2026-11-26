@@ -10,9 +10,12 @@
 // 매우 어려움: 제목·가수·작품명(곡에 있는 항목)을 각자 맞힌 시점의 속도 점수로 나눠 받고, 전부 맞혀야 '정답'으로 잠긴다.
 // 일부만 맞힌 사람도 공개 때 그 점수를 받는다. 다른 사람에게는 맞힌 항목 개수(solved)만 보인다.
 //
-// 클라이언트 → 서버: join, settings, start, ready, answer, pass, hint, playerError, chat, ping, leave
+// 클라이언트 → 서버: join, settings, start, ready, answer, pass, hint, playerError, chat, skip, react, ping, leave
 // 서버 → 클라이언트: joined, state, prepare, go, locked, answerResult, rateLimited, reveal, gameOver, notice, error, pong, kicked,
-//                   hint, chat, chatLog, chatBlocked
+//                   hint, chat, chatLog, chatBlocked, reaction
+// 정답 공개: 방에서 정한 시간(settings.revealTime) 동안. 접속한 사람 전원이 넘기기(skip)에 투표하면 바로 다음 라운드.
+// 리액션: 정답 공개 중에만 REACTIONS의 이모지를 보낼 수 있고 모두에게 그대로 전달한다(기록하지 않음).
+// 곡 교체: 준비 단계에서 과반이 재생하지 못하면 곡을 바꾸되, 한 라운드에서 maxSongReplacements번을 넘으면 게임을 멈춘다.
 // 초성 힌트: 쉬움 제외, 답할 수 있는 사람이 라운드당 1번 요청하면 본인에게만 초성을 보낸다(매우 어려움은 가수·작품명도). 이후 얻는 점수는 SCORING.hint만큼 깎인다.
 // 채팅: 대기실·게임·결과 어디서나. 라운드 중(공개 전)에는 정답이 들어간 채팅을 막는다(chatBlocked {reason: 'answer'}).
 // 라운드 메시지(ready, answer, pass, playerError)는 roundId가 현재 라운드와 다르면 조용히 무시한다.
@@ -22,6 +25,7 @@ import { DIFFICULTY, buildChoices, canUseMultipleChoice, hintParts, itemCandidat
 import { MODE } from '../js/game.js';
 import { SCORING, answerWindow, applyHint, isValidRounds, scoreExtremeBonus, scoreExtremeItem, scoreMulti } from '../js/scoring.js';
 import { pickSegmentStart } from '../js/segment.js';
+import { REACTION_COOLDOWN_MS, isReaction } from '../js/online/reactions.js';
 import { addSongStats, roundSongStats } from '../js/songStats.js';
 
 export const ROOM_PHASE = Object.freeze({
@@ -51,7 +55,7 @@ export const ROOM_CONFIG = Object.freeze({
   maxPlayers: SCORING.multi.maxPlayers,
   goLeadMs: 3000, // go를 보낸 뒤 실제 시작까지(네트워크 지연 흡수용 카운트다운)
   readyTimeoutMs: 10000,
-  revealMs: 10000, // 정답 공개 후 다음 라운드까지(영상이 보이는 시간)
+  maxSongReplacements: 3, // 한 라운드에서 재생 못 한 곡을 바꾸는 최대 횟수(넘으면 게임을 멈춘다. 재생이 안 되는 환경에서 곡을 다 써 버리지 않게)
   reconnectGraceMs: 60000,
   answerCooldownMs: 1000,
   maxNicknameLength: 12,
@@ -59,6 +63,7 @@ export const ROOM_CONFIG = Object.freeze({
   maxChatLength: 100,
   chatCooldownMs: 500, // 한 사람이 채팅을 보내는 최소 간격
   chatLogSize: 50, // 새로 들어오거나 재접속한 사람에게 보내 주는 최근 채팅 수
+  reactionCooldownMs: REACTION_COOLDOWN_MS,
 });
 
 export const DEFAULT_SETTINGS = Object.freeze({
@@ -67,6 +72,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
   clipLength: SCORING.defaultClipLength,
   difficulty: DIFFICULTY.NORMAL,
   answerTime: SCORING.multi.defaultAnswerTime,
+  fullTime: SCORING.multi.defaultFullTime,
+  revealTime: SCORING.multi.defaultRevealTime,
 });
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 헷갈리는 I, O, 0, 1 제외
@@ -167,6 +174,7 @@ export class Room {
     this.history = [];
     this.stalled = false;
     this.playableSongs = [];
+    this.replacements = 0; // 이번 라운드에서 곡을 바꾼 횟수
   }
 
   // ---------- 외부 진입점 ----------
@@ -198,6 +206,10 @@ export class Room {
         return this.onPlayerError(player, message);
       case 'chat':
         return this.onChat(player, message);
+      case 'skip':
+        return this.onSkip(player, message);
+      case 'react':
+        return this.onReact(player, message);
       case 'leave':
         return this.removePlayer(player);
       default:
@@ -245,6 +257,11 @@ export class Room {
     return [ROOM_PHASE.PREPARING, ROOM_PHASE.STARTING, ROOM_PHASE.ANSWERING, ROOM_PHASE.REVEALED].includes(this.phase);
   }
 
+  /** 정답 공개 시간(ms) */
+  get revealMs() {
+    return this.settings.revealTime * 1000;
+  }
+
   get hasNext() {
     return this.roundIndex + 1 < this.totalRounds && this.queue.length > 0;
   }
@@ -273,6 +290,8 @@ export class Room {
           solved: round?.items && this.isInGame ? (round.players.get(p.id)?.solved.size ?? 0) : null,
           // 이번 라운드에 초성 힌트를 봤는지(힌트 내용은 본인에게만 보낸다)
           hint: round && this.isInGame ? !!round.players.get(p.id)?.hintUsed : null,
+          // 정답 공개 중 넘기기에 투표했는지
+          skip: round && this.phase === ROOM_PHASE.REVEALED ? round.skipVotes.has(p.id) : null,
         })),
       round: round && this.isInGame ? { id: round.id, index: this.roundIndex, total: this.totalRounds } : null,
     };
@@ -363,6 +382,7 @@ export class Room {
       score: 0,
       correct: 0,
       lastChatAt: null,
+      lastReactionAt: null,
     };
     this.players.set(player.id, player);
     this.connToPlayer.set(connId, player.id);
@@ -510,6 +530,8 @@ export class Room {
       clipLength: (v) => SCORING.clipLengths.includes(v),
       difficulty: (v) => Object.values(DIFFICULTY).includes(v),
       answerTime: (v) => SCORING.multi.answerTimes.includes(v),
+      fullTime: (v) => SCORING.multi.fullTimes.includes(v),
+      revealTime: (v) => SCORING.multi.revealTimes.includes(v),
     };
     for (const [key, valid] of Object.entries(rules)) {
       if (!(key in input)) continue;
@@ -569,13 +591,14 @@ export class Room {
   // ---------- 라운드 ----------
   beginRound() {
     this.roundIndex++;
+    this.replacements = 0;
     this.createRound(this.queue.shift());
   }
 
   /** 곡 하나로 새 roundId의 준비 단계를 연다(곡 교체 때도 쓴다) */
   createRound(song) {
     this.clearRoundTimers();
-    const { mode, clipLength, answerTime } = this.settings;
+    const { mode, clipLength, answerTime, fullTime } = this.settings;
     const isRandom = mode === MODE.RANDOM;
     const segmentStart = isRandom
       ? pickSegmentStart(
@@ -604,11 +627,13 @@ export class Room {
       song,
       segmentStart,
       choices: this.difficulty === DIFFICULTY.EASY ? buildChoices(song, this.playableSongs, this.rng) : null,
-      window: answerWindow({ mode, clipLength, answerTime }),
+      window: answerWindow({ mode, clipLength, answerTime, fullTime }),
       startAt: null,
       deadlineAt: null,
       players,
       correctCount: 0,
+      skipVotes: new Set(), // 정답 공개 중 넘기기에 투표한 playerId
+      revealEndsAt: null,
       // 매우 어려움: 맞혀야 할 항목 키(값은 공개 전까지 보내지 않는다)
       items: this.difficulty === DIFFICULTY.EXTREME ? Object.keys(itemCandidates(song)) : null,
       priorStats: null, // 매우 어려움: 이 곡의 지금까지 정답률 기록(저장소에서 읽히면 채운다)
@@ -729,10 +754,22 @@ export class Room {
     this.startCountdown();
   }
 
-  /** 과반이 재생하지 못한 곡을 바꾸고 라운드를 다시 준비한다. 곡 부족 시 라운드 축소(개인전과 같은 규칙) */
+  /**
+   * 과반이 재생하지 못한 곡을 바꾸고 라운드를 다시 준비한다. 곡 부족 시 라운드 축소(개인전과 같은 규칙).
+   * 한 라운드에서 maxSongReplacements번 넘게 바꿔야 하면 재생 환경 문제로 보고 게임을 멈춘다(곡을 다 써 버리지 않게).
+   */
   replaceSong(reason) {
     this.clearRoundTimers();
     const cause = reason === 'error' ? '재생 오류' : '준비 지연';
+    if (this.replacements >= this.config.maxSongReplacements) {
+      this.broadcast({
+        type: 'notice',
+        message: `곡을 ${this.replacements + 1}번 연달아 재생하지 못해(${cause}) 게임을 멈췄습니다. 인터넷 연결이나 브라우저 설정(광고 차단 등)을 확인해 주세요.`,
+      });
+      this.gameOver('playback-failed');
+      return;
+    }
+    this.replacements++;
     if (this.queue.length === 0) {
       this.totalRounds = this.roundIndex;
       this.broadcast({ type: 'notice', message: `재생할 수 없는 곡을 건너뛰었습니다(${cause}). 남은 곡이 없어 ${this.totalRounds}라운드로 마칩니다.` });
@@ -894,6 +931,7 @@ export class Room {
       clipLength: this.settings.clipLength,
       elapsed,
       answerTime: this.settings.answerTime,
+      fullTime: this.settings.fullTime,
     });
     return applyHint(points, entry.hintUsed);
   }
@@ -981,6 +1019,7 @@ export class Room {
     };
     this.history.push(record);
     this.phase = ROOM_PHASE.REVEALED;
+    round.revealEndsAt = this.now() + this.revealMs;
     const stats = this.recordSongStats(round);
 
     const willContinue = this.hasNext && this.connectedMembers.length >= this.config.minPlayers;
@@ -993,13 +1032,44 @@ export class Room {
       scores: this.members.map((p) => ({ playerId: p.id, score: p.score })),
       nextVideoId: willContinue ? this.queue[0].videoId : null,
       hasNext: willContinue,
+      nextAt: round.revealEndsAt, // 다음 라운드(또는 결과)로 넘어가는 서버 시각. 전원이 넘기기에 투표하면 더 빨라진다
     });
     this.broadcastState();
     if (this.connectedMembers.length === 0) {
       this.stall();
       return;
     }
-    this.setTimer('reveal', this.config.revealMs, () => this.advance());
+    this.setTimer('reveal', this.revealMs, () => this.advance());
+  }
+
+  // ---------- 정답 공개 중: 넘기기 투표·리액션 ----------
+  /** 넘기기 투표. 접속한 사람 전원이 투표하면 공개 시간을 기다리지 않고 넘어간다 */
+  onSkip(player, message) {
+    const round = this.round;
+    if (this.phase !== ROOM_PHASE.REVEALED || !round || message.roundId !== round.id || round.skipVotes.has(player.id)) return;
+    round.skipVotes.add(player.id);
+    if (this.checkSkipVotes()) return;
+    this.broadcastState();
+  }
+
+  /** 접속한 사람이 모두 넘기기에 투표했으면 다음으로 넘어간다. 넘어갔으면 true */
+  checkSkipVotes() {
+    const round = this.round;
+    if (this.phase !== ROOM_PHASE.REVEALED || !round || round.skipVotes.size === 0) return false;
+    const connected = this.connectedMembers;
+    if (connected.length === 0 || !connected.every((p) => round.skipVotes.has(p.id))) return false;
+    this.clearTimer('reveal');
+    this.advance();
+    return true;
+  }
+
+  /** 이모지 리액션: 정답 공개 중에만, 목록에 있는 이모지만, 한 사람당 reactionCooldownMs 간격 */
+  onReact(player, message) {
+    if (this.phase !== ROOM_PHASE.REVEALED || !isReaction(message.emoji)) return;
+    const now = this.now();
+    if (player.lastReactionAt != null && now - player.lastReactionAt < this.config.reactionCooldownMs) return;
+    player.lastReactionAt = now;
+    this.broadcast({ type: 'reaction', playerId: player.id, emoji: message.emoji, at: now });
   }
 
   advance() {
@@ -1043,6 +1113,7 @@ export class Room {
     }
     if (this.phase === ROOM_PHASE.PREPARING) this.evaluatePrep();
     else if (this.phase === ROOM_PHASE.STARTING || this.phase === ROOM_PHASE.ANSWERING) this.checkAllDone();
+    else if (this.phase === ROOM_PHASE.REVEALED) this.checkSkipVotes(); // 남은 사람이 모두 투표했을 수 있다
   }
 
   /** 접속한 사람이 아무도 없다: 타이머를 멈추고 재접속(또는 유예 만료로 방 삭제)을 기다린다 */

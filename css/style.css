@@ -314,6 +314,37 @@ textarea { min-height: 100px; margin: 8px 0; }
 .reveal-result.bad { color: var(--bad); background: #3d1f24; }
 #reveal-anime, #on-reveal-anime { color: var(--muted); }
 
+/* 친구와 대결 정답 공개: 리액션 버튼, 넘기기 투표 */
+.reactions { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; margin: 12px 0 8px; }
+.reactions .reaction-btn { min-width: 0; margin: 0; padding: 0; font-size: 1.3rem; line-height: 1; }
+@media (max-width: 420px) { .reactions { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.reveal-next { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.reveal-next p { flex: 1 1 12em; }
+.reveal-next .btn { flex: none; margin-top: 0; }
+
+/* 영상 위로 떠오르는 리액션 */
+.reaction-layer { position: absolute; inset: 0; z-index: 20; pointer-events: none; overflow: hidden; }
+.reaction-float {
+  position: absolute;
+  bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateX(-50%);
+  animation: reaction-rise 2.4s ease-out forwards;
+}
+.reaction-emoji { font-size: 2rem; line-height: 1; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6)); }
+.reaction-name { font-size: 0.75rem; font-weight: 700; text-shadow: 0 1px 3px #000; white-space: nowrap; }
+@keyframes reaction-rise {
+  0% { opacity: 0; transform: translate(-50%, 0) scale(0.6); }
+  12% { opacity: 1; transform: translate(-50%, -12px) scale(1.1); }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--drift, 0px)), -150px) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reaction-float { animation: reaction-fade 2s linear forwards; }
+  @keyframes reaction-fade { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+}
+
 /* 결과 */
 .final-score {
   font-size: 3.4rem;
@@ -393,6 +424,7 @@ textarea { min-height: 100px; margin: 8px 0; }
 .chip.st-off { background: transparent; border: 1px dashed #4a4f62; }
 .overlay-text { font-size: 1.15rem; font-weight: 600; }
 .settings fieldset:disabled { opacity: 0.55; }
+.settings fieldset[hidden] { display: none; }
 .settings fieldset:disabled span { cursor: default; }
 
 /* 친구와 대결 채팅(대기실·게임·결과 화면을 옮겨 다닌다) */

@@ -8,6 +8,7 @@ import { RoomConnection } from './connection.js';
 import { buildInviteLink, resolveServerUrl, roomsUrl, webSocketUrl } from './config.js';
 import { ClockSync } from './net.js';
 import { OnlinePlayback, PLAYBACK_STAGE } from './playback.js';
+import { REACTIONS } from './reactions.js';
 import { CHAT_LIMITS, OnlineSession, playerColor } from './session.js';
 import { handleGameKey } from '../hotkeys.js';
 import { youtubeWatchUrl } from '../linkParser.js';
@@ -50,7 +51,10 @@ const REASON_TEXT = {
 const GAME_OVER_NOTE = {
   'not-enough-players': '남은 인원이 부족해 게임을 마쳤습니다.',
   'no-playable': '재생할 수 있는 곡이 없어 게임을 진행하지 못했습니다.',
+  'playback-failed': '곡을 연달아 재생하지 못해 게임을 멈췄습니다. 인터넷 연결이나 브라우저 설정(광고 차단 등)을 확인한 뒤 다시 시작해 주세요.',
 };
+// 한 번에 화면에 떠 있는 리액션 최대 개수(많이 누르면 오래된 것부터 지운다)
+const MAX_FLOATING_REACTIONS = 24;
 // 이 이유로 닫힐 때는 서버가 보낸 오류 메시지를 이미 보여 줬다
 const QUIET_CLOSE = ['left', 'game-started', 'room-full', 'bad-nickname'];
 const CLOSE_TEXT = {
@@ -100,7 +104,9 @@ function safe(fn, fallback = null) {
 const SETTING_GROUPS = [
   ['mode', '모드', [[MODE.RANDOM, '랜덤듣기'], [MODE.FULL, '전체듣기']]],
   ['clipLength', '구간 길이', SCORING.clipLengths.map((n) => [n, `${n}초`])],
-  ['answerTime', '답변 시간', SCORING.multi.answerTimes.map((n) => [n, `${n}초`])],
+  ['answerTime', '답변 시간', SCORING.multi.answerTimes.map((n) => [n, `${n}초`])], // 랜덤듣기: 구간이 끝난 뒤
+  ['fullTime', '제한 시간', SCORING.multi.fullTimes.map((n) => [n, `${n}초`])], // 전체듣기
+  ['revealTime', '정답 공개', SCORING.multi.revealTimes.map((n) => [n, `${n}초`])],
   ['rounds', '라운드', SCORING.roundOptions.map((n) => [n, `${n}`])],
   ['difficulty', '난이도', [[DIFFICULTY.EASY, '쉬움'], [DIFFICULTY.NORMAL, '보통'], [DIFFICULTY.HARD, '어려움'], [DIFFICULTY.EXTREME, '매우 어려움']]],
 ];
@@ -157,7 +163,7 @@ export class OnlineApp {
 
   /** 볼륨 슬라이더. 개인전 화면과 같은 VolumeControl을 공유한다 */
   volumeRow() {
-    const input = el('input', { type: 'range', min: '0', max: '100', step: '1', 'aria-label': '노래 볼륨' });
+    const input = el('input', { type: 'range', min: '0', max: '100', step: '1', 'data-volume': true, 'aria-label': '노래 볼륨' });
     const value = el('span', { class: 'volume-value', 'aria-hidden': 'true' });
     if (this.volume) bindVolumeInput(this.volume, input, value);
     return el(
@@ -297,6 +303,7 @@ export class OnlineApp {
     session.on('change', () => this.render());
     session.on('notice', (message) => this.app.toast(message));
     session.on('error', (message) => this.app.toast(message.message || '요청을 처리하지 못했습니다.'));
+    session.on('reaction', (reaction) => this.showReaction(reaction));
     connection.on('message', (message) => {
       if (message.type === 'joined') this.handleJoined(message, nickname);
     });
@@ -544,10 +551,12 @@ export class OnlineApp {
     );
     const isHost = s.isHost;
     $('#on-settings-note').textContent = isHost ? '' : '(방장이 정합니다)';
+    const full = room.settings.mode === MODE.FULL;
     for (const [key] of SETTING_GROUPS) {
       const fieldset = $(`#on-set-${key}`);
-      const full = room.settings.mode === MODE.FULL;
-      fieldset.disabled = !isHost || ((key === 'clipLength' || key === 'answerTime') && full);
+      // 답변 시간은 모드마다 따로: 랜덤듣기는 구간 뒤 답변 시간, 전체듣기는 제한 시간
+      fieldset.hidden = (key === 'answerTime' && full) || (key === 'fullTime' && !full);
+      fieldset.disabled = !isHost || (key === 'clipLength' && full);
       for (const input of $$('input[type="radio"]', fieldset)) input.checked = input.value === String(room.settings[key]);
     }
     // 빠른 선택에 없는 라운드 수는 직접 입력칸에 보인다(입력 중이면 건드리지 않는다)
@@ -594,6 +603,8 @@ export class OnlineApp {
           // 초성 힌트(매우 어려움이 아닐 때): 정답 영상이 뜨는 무대 가운데에 크게
           el('p', { class: 'overlay-hint', id: 'on-overlay-hint', 'aria-live': 'polite', hidden: true }, el('strong', { id: 'on-overlay-hint-text' }), el('span', { text: '제목 초성' })),
         ),
+        // 정답 공개 중 이모지 리액션이 떠오르는 자리(영상 위)
+        el('div', { class: 'reaction-layer', id: 'on-reaction-layer', 'aria-hidden': 'true' }),
       ),
       el('div', { class: 'progress', 'aria-label': '남은 시간' }, el('div', { class: 'progress-bar', id: 'on-progress-bar' })),
       el('p', { class: 'progress-label', id: 'on-progress-label' }),
@@ -628,10 +639,46 @@ export class OnlineApp {
         el('p', { id: 'on-reveal-anime' }),
         el('p', { class: 'sub', id: 'on-reveal-stats' }),
         el('p', { class: 'sub', id: 'on-reveal-excluded' }),
-        el('p', { class: 'sub', id: 'on-reveal-next' }),
+        el(
+          'div',
+          { class: 'reactions', role: 'group', 'aria-label': '리액션 보내기' },
+          ...REACTIONS.map((emoji) =>
+            el('button', { type: 'button', class: 'btn reaction-btn', text: emoji, 'aria-label': `${emoji} 보내기`, onclick: () => this.session?.react(emoji) }),
+          ),
+        ),
+        el(
+          'div',
+          { class: 'reveal-next' },
+          el('p', { class: 'sub', id: 'on-reveal-next', role: 'status' }),
+          el('button', {
+            type: 'button',
+            class: 'btn primary',
+            id: 'on-skip',
+            title: '모두 누르면 기다리지 않고 바로 넘어가요',
+            onclick: () => this.session?.skip(),
+          }),
+        ),
       ),
       el('div', { class: 'chat-slot' }),
     );
+  }
+
+  /** 받은 리액션을 영상 위에 잠깐 띄운다(보낸 사람 이름 색과 함께) */
+  showReaction({ playerId, emoji }) {
+    const layer = $('#on-reaction-layer');
+    if (!layer || this.app.screen !== 'online-game') return;
+    while (layer.childElementCount >= MAX_FLOATING_REACTIONS) layer.firstElementChild.remove();
+    const nickname = this.session?.room?.players.find((p) => p.id === playerId)?.nickname ?? '';
+    const node = el(
+      'span',
+      { class: 'reaction-float', style: `left: ${8 + Math.random() * 84}%; --drift: ${Math.round((Math.random() - 0.5) * 60)}px` },
+      el('span', { class: 'reaction-emoji', text: emoji }),
+      el('span', { class: 'reaction-name', text: playerId === this.session?.you ? '나' : nickname, style: `color: ${playerColor(playerId)}` }),
+    );
+    const remove = () => node.remove();
+    node.addEventListener('animationend', remove);
+    setTimeout(remove, 4000); // 애니메이션이 꺼진 환경 대비
+    layer.append(node);
   }
 
   requestHint() {
@@ -836,7 +883,22 @@ export class OnlineApp {
       $('#on-reveal-excluded').textContent = r.excluded?.length
         ? `제외된 사람: ${r.excluded.map((e) => `${names.get(e.playerId) ?? '?'}(${STATUS_CHIP[e.reason] ?? e.reason})`).join(', ')}`
         : '';
-      $('#on-reveal-next').textContent = r.hasNext ? '잠시 뒤 다음 라운드가 시작돼요.' : '잠시 뒤 결과가 나와요.';
+      const secs = s.revealSecondsLeft();
+      const when = secs == null ? '잠시 뒤' : `${Math.ceil(secs)}초 뒤`;
+      $('#on-reveal-next').textContent = r.hasNext ? `${when} 다음 라운드가 시작돼요.` : `${when} 결과가 나와요.`;
+      const { votes, total, mine } = s.skipVotes();
+      const skip = $('#on-skip');
+      skip.disabled = mine;
+      skip.textContent = `${mine ? '모두 기다리는 중' : r.hasNext ? '다음으로' : '결과 보기'} (${votes}/${total})`;
+      // 공개되는 순간 넘기기 버튼에 포커스(Enter로 투표). 채팅을 쓰는 중이면 뺏지 않는다
+      if (this.revealFocusedRound !== r.roundId) {
+        this.revealFocusedRound = r.roundId;
+        const active = document.activeElement;
+        const chatting = active?.id === 'on-chat-input' && active.value.trim();
+        if (!chatting && !active?.matches?.('[data-volume]')) skip.focus();
+      }
+    } else {
+      $('#on-reaction-layer').replaceChildren();
     }
   }
 

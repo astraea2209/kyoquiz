@@ -307,7 +307,7 @@ test('전체듣기: 제한시간 30초, 점수는 개인전 공식', () => {
   env.passRest();
   assert.equal(env.last('a', 'reveal').correctPlayers[0].points, 80);
 
-  env.timers.advance(env.room.config.revealMs); // 다음 라운드: 시간 만료
+  env.timers.advance(env.room.revealMs); // 다음 라운드: 시간 만료
   env.readyAll();
   env.timers.advance(3000 + 29_999);
   assert.equal(env.state().phase, ROOM_PHASE.ANSWERING);
@@ -341,7 +341,7 @@ test('늦게 도착한 이전 라운드 메시지는 다음 라운드에 영향�
   const firstRound = env.round().id;
   env.answer('a', env.correctText());
   env.passRest();
-  env.timers.advance(env.room.config.revealMs); // 다음 라운드 준비
+  env.timers.advance(env.room.revealMs); // 다음 라운드 준비
   assert.notEqual(env.round().id, firstRound);
   env.send('b', { type: 'ready', roundId: firstRound });
   env.send('b', { type: 'answer', roundId: firstRound, text: env.correctText() });
@@ -514,7 +514,7 @@ test('곡 교체 후 남은 곡이 없으면 지금까지의 라운드로 마친
   env.begin();
   env.answer('a', env.correctText());
   env.passRest();
-  env.timers.advance(env.room.config.revealMs); // 2라운드 준비
+  env.timers.advance(env.room.revealMs); // 2라운드 준비
   assert.equal(env.round().id, 2);
   env.send('a', { type: 'playerError', roundId: 2, code: 150 });
   env.send('b', { type: 'playerError', roundId: 2, code: 150 });
@@ -569,7 +569,7 @@ test('여러 라운드에 걸쳐 점수가 쌓이고 타이머가 남지 않는�
     env.timers.advance(3000 + 1000);
     env.answer(i === 1 ? 'b' : 'a', env.correctText());
     env.passRest();
-    env.timers.advance(env.room.config.revealMs);
+    env.timers.advance(env.room.revealMs);
   }
   assert.equal(env.state().phase, ROOM_PHASE.RESULTS);
   const over = env.last('a', 'gameOver');
