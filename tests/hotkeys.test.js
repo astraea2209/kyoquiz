@@ -1,7 +1,7 @@
 // 게임 화면 단축키: 패스 K(입력칸 밖), Esc로 입력칸 빠져나오기
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { VOLUME_KEY_STEP, handleGameKey, isPassKey, isTypingTarget, volumeKeyDelta } from '../js/hotkeys.js';
+import { VOLUME_KEY_STEP, choiceKeyIndex, handleGameKey, isPassKey, isTypingTarget, volumeKeyDelta } from '../js/hotkeys.js';
 
 const input = (type = 'text') => ({ tagName: 'INPUT', type, blurred: false, blur() { this.blurred = true; } });
 const body = { tagName: 'BODY' };
@@ -121,4 +121,33 @@ test('handleGameKey: ↑↓로 볼륨을 바꾸고 스크롤을 막는다', () =
   const plain = keyEvent({ key: 'ArrowUp' });
   assert.equal(handleGameKey(plain, { pass: () => true }), null);
   assert.equal(plain.prevented, false);
+});
+
+test('choiceKeyIndex: 숫자키 1~4(키패드 포함)는 보기 0~3, 그 밖은 -1', () => {
+  assert.equal(choiceKeyIndex(keyEvent({ key: '1', code: 'Digit1' })), 0);
+  assert.equal(choiceKeyIndex(keyEvent({ key: '4', code: 'Digit4' })), 3);
+  assert.equal(choiceKeyIndex(keyEvent({ key: '2', code: 'Numpad2' })), 1);
+  assert.equal(choiceKeyIndex(keyEvent({ key: '3', code: '' })), 2, 'code가 없으면 key로');
+  assert.equal(choiceKeyIndex(keyEvent({ key: '5', code: 'Digit5' })), -1);
+  assert.equal(choiceKeyIndex(keyEvent({ key: '0', code: 'Digit0' })), -1);
+  assert.equal(choiceKeyIndex(keyEvent({ key: '1', code: 'Digit1', ctrlKey: true })), -1);
+  assert.equal(choiceKeyIndex(keyEvent({ key: '1', code: 'Digit1', repeat: true })), -1, '누르고 있어도 한 번만');
+  assert.equal(choiceKeyIndex(keyEvent({ key: 'k', code: 'KeyK' })), -1);
+});
+
+test('handleGameKey: 숫자키로 객관식 보기 고르기(입력칸 안에서는 안 함)', () => {
+  const chosen = [];
+  const actions = { pass: () => true, choose: (i) => (chosen.push(i), true) };
+  const event = keyEvent({ key: '2', code: 'Digit2' });
+  assert.equal(handleGameKey(event, actions), 'choose');
+  assert.equal(event.prevented, true);
+  assert.deepEqual(chosen, [1]);
+  assert.equal(handleGameKey(keyEvent({ key: '2', code: 'Digit2', target: input() }), actions), null);
+  // 고를 수 없으면(이미 틀린 보기, 공개 중) 기본 동작 그대로
+  const blocked = keyEvent({ key: '1', code: 'Digit1' });
+  assert.equal(handleGameKey(blocked, { pass: () => true, choose: () => false }), null);
+  assert.equal(blocked.prevented, false);
+  // choose를 안 넘기면 숫자키는 무시
+  assert.equal(handleGameKey(keyEvent({ key: '1', code: 'Digit1' }), { pass: () => true }), null);
+  assert.deepEqual(chosen, [1]);
 });

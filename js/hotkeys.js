@@ -5,6 +5,7 @@
 // - Esc: 입력칸에서 빠져나온다(그다음 K로 패스).
 // - ↑/↓: 노래 볼륨 ±VOLUME_KEY_STEP. 한 줄 입력칸(답·채팅)에서도 된다(입력 중에도 바로 조절하게).
 //   볼륨 슬라이더 자체에서는 브라우저 기본 동작(1씩)에 맡기고, 여러 줄 입력칸·선택 목록에서는 쓰지 않는다.
+// - 1~4: 쉬움(객관식)에서 보기 고르기. 글자 입력칸에서는 동작하지 않는다.
 
 // 글자를 입력하지 않는 input 종류. 여기서는 K를 단축키로 쓴다
 const NON_TEXT_INPUTS = new Set(['button', 'checkbox', 'color', 'file', 'image', 'radio', 'range', 'reset', 'submit']);
@@ -49,6 +50,13 @@ export function volumeKeyDelta(event) {
   return delta;
 }
 
+/** 객관식(쉬움) 보기 고르기 숫자키 1~4(키패드 포함)면 보기 번호 0~3, 아니면 -1 */
+export function choiceKeyIndex(event) {
+  if (!event || hasModifier(event) || event.repeat || event.isComposing) return -1;
+  const match = /^(?:Digit|Numpad)([1-4])$/.exec(event.code ?? '') ?? /^([1-4])$/.exec(event.key ?? '');
+  return match ? Number(match[1]) - 1 : -1;
+}
+
 /**
  * 게임 화면 keydown 처리.
  * @param {KeyboardEvent} event
@@ -56,9 +64,10 @@ export function volumeKeyDelta(event) {
  * @param {() => boolean} actions.pass  지금 패스할 수 있으면 패스하고 true
  * @param {() => boolean} [actions.next]  정답 공개 중이라 다음으로 넘어갈 수 있으면 넘기고 true
  * @param {(delta: number) => void} [actions.volume]  볼륨을 delta만큼 바꾼다
- * @returns {'pass'|'next'|'blur'|'volume'|null}  처리한 동작(처리했으면 event.preventDefault()를 불렀다)
+ * @param {(index: number) => boolean} [actions.choose]  객관식 보기 index를 고를 수 있으면 고르고 true
+ * @returns {'pass'|'next'|'blur'|'volume'|'choose'|null}  처리한 동작(처리했으면 event.preventDefault()를 불렀다)
  */
-export function handleGameKey(event, { pass, next = () => false, volume = null }) {
+export function handleGameKey(event, { pass, next = () => false, volume = null, choose = null }) {
   const target = event.target;
   if (event.key === 'Escape' && isTypingTarget(target) && !event.isComposing) {
     target.blur?.();
@@ -72,6 +81,11 @@ export function handleGameKey(event, { pass, next = () => false, volume = null }
       event.preventDefault(); // 화면 스크롤·입력칸 커서 이동 대신
       return 'volume';
     }
+  }
+  const choice = choose ? choiceKeyIndex(event) : -1;
+  if (choice >= 0 && !isTypingTarget(target) && choose(choice)) {
+    event.preventDefault();
+    return 'choose';
   }
   if (isPassKey(event) && !isTypingTarget(target)) {
     if (pass()) {

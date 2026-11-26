@@ -68,6 +68,25 @@ function songLink(title, videoId, startSeconds) {
   });
 }
 
+/** 결과 목록 한 줄(결과 화면, 게임 중 '이번 게임' 패널 공용): 표시 · 곡 제목(링크)과 작품 · 점수 */
+function historyItem(h, index) {
+  const partial = !h.correct && h.solved?.length > 0;
+  const state = h.correct ? 'ok' : partial ? 'partial' : 'bad';
+  const sub = [
+    h.song.anime?.name ?? h.song.artist,
+    h.items ? `${h.solved.length}/${h.items.length}` : null,
+    h.hintUsed ? '힌트' : null,
+  ].filter(Boolean);
+  return el(
+    'li',
+    { class: `res ${state}` },
+    el('span', { class: 'res-index', text: String(index + 1) }),
+    el('span', { class: 'res-mark', text: h.correct ? '○' : partial ? '△' : '×', 'aria-label': h.correct ? '정답' : partial ? '일부 정답' : '오답' }),
+    el('span', { class: 'res-body' }, songLink(h.song.title, h.song.videoId, h.segmentStart), ...(sub.length ? [el('span', { class: 'res-sub', text: sub.join(' · ') })] : [])),
+    el('span', { class: 'pts', text: `${h.points}점` }),
+  );
+}
+
 export class App {
   constructor({ store, durationCache, highScores, storage, volume = null }) {
     this.volume = volume; // 노래 볼륨(↑↓ 단축키)
@@ -229,6 +248,7 @@ export class App {
     game.on('toast', (message) => this.toast(message));
     $('#feedback').textContent = '';
     $('#answer-input').value = '';
+    this.renderedHistoryLength = null;
     this.showScreen('game');
     game.start();
     this.renderGame();
@@ -257,6 +277,10 @@ export class App {
       handleGameKey(event, {
         pass: () => clickIfEnabled($('#pass-btn')),
         next: () => clickIfEnabled($('#next-btn')),
+        choose: (index) => {
+          const btn = $$('#choices .btn')[index];
+          return !!btn && clickIfEnabled(btn);
+        },
         volume: this.volume ? (delta) => this.volume.set(this.volume.value + delta) : null,
       });
     });
@@ -368,7 +392,7 @@ export class App {
     $('#score-label').textContent = `${game.score}점`;
 
     // 플레이어/오버레이
-    for (const [i, slot] of $$('.player-slot').entries()) {
+    for (const [i, slot] of $$('#screen-game .player-slot').entries()) {
       slot.classList.toggle('active', i === game.active);
       // iframe title(영상 제목)이 스크린리더·접근성 트리로 정답을 알려 주지 않도록 공개 전에는 inert
       slot.inert = !game.isPlayerVisible(i);
@@ -387,6 +411,10 @@ export class App {
     // 진행 바
     $('#progress-bar').style.width = `${Math.round(game.progress * 100)}%`;
     const answerLeft = game.answerSecondsLeft();
+    // 남은 시간이 5초 이하면 진행 바를 붉게
+    const timeLeft = game.isRandom ? answerLeft : phase === PHASE.PLAYING ? s.timeLimit - game.audibleElapsed() : null;
+    $('#screen-game .progress').classList.toggle('low', !revealed && timeLeft != null && timeLeft <= 5);
+    this.renderRoundLog(game);
     $('#progress-label').textContent = !game.isRandom
       ? `${Math.min(game.audibleElapsed(), s.timeLimit).toFixed(1)} / ${s.timeLimit}초`
       : answerLeft != null
@@ -519,23 +547,26 @@ export class App {
     }
     $('#result-note').textContent = notes.join(' ');
 
-    const list = $('#result-list');
-    list.replaceChildren(
-      ...game.history.map((h) => {
-        const partial = !h.correct && h.solved?.length > 0;
-        return el(
-          'li',
-          {},
-          el('span', { class: 'pts', text: `${h.points}점` }),
-          el('span', { class: h.correct || partial ? 'ok' : 'bad', text: h.correct ? '○ ' : partial ? '△ ' : '× ' }),
-          songLink(h.song.title, h.song.videoId, h.segmentStart),
-          ...[h.song.anime?.name ?? h.song.artist].filter(Boolean).map((name) => ` — ${name}`),
-          ...(h.items ? [` (${h.solved.length}/${h.items.length})`] : []),
-          ...(h.hintUsed ? [' (힌트)'] : []),
-        );
-      }),
-    );
+    $('#result-summary').textContent = played ? `${MODE_LABEL[mode]} · ${DIFFICULTY_LABEL[game.difficulty]} · ${this.historySummary(game.history)}` : '';
+    $('#result-list').replaceChildren(...game.history.map(historyItem));
     this.showScreen('result');
+    $('#again-btn').focus(); // Enter로 바로 같은 설정 다시 하기
+  }
+
+  /** '정답 3 / 5곡' (매우 어려움에서 일부만 맞힌 곡은 따로) */
+  historySummary(history) {
+    const correct = history.filter((h) => h.correct).length;
+    const partial = history.filter((h) => !h.correct && h.solved?.length > 0).length;
+    return `정답 ${correct} / ${history.length}곡${partial ? ` · 일부 정답 ${partial}곡` : ''}`;
+  }
+
+  /** 게임 중 '이번 게임' 패널: 정답이 공개된 곡을 쌓는다(최근 곡이 위) */
+  renderRoundLog(game) {
+    if (this.renderedHistoryLength === game.history.length) return;
+    this.renderedHistoryLength = game.history.length;
+    const items = game.history.map(historyItem).reverse();
+    $('#round-log').replaceChildren(...items);
+    $('#round-log-summary').textContent = game.history.length ? this.historySummary(game.history) : '';
   }
 
   // ---------- 곡 관리 ----------

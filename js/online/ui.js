@@ -160,6 +160,12 @@ export class OnlineApp {
       handleGameKey(event, {
         pass: () => !$('#on-pass').disabled && !!this.session?.pass(),
         next: () => !$('#on-skip').disabled && !!this.session?.skip(),
+        choose: (index) => {
+          const btn = $$('#on-choices .btn')[index];
+          if (!btn || btn.disabled || $('#on-choices').hidden || $('#on-answer-area').hidden) return false;
+          btn.click();
+          return true;
+        },
         volume: this.volume ? (delta) => this.volume.set(this.volume.value + delta) : null,
       });
     });
@@ -167,14 +173,15 @@ export class OnlineApp {
 
   /** 볼륨 슬라이더. 개인전 화면과 같은 VolumeControl을 공유한다 */
   volumeRow() {
+    return el('div', { class: 'volume-row' }, this.volumeControl('볼륨'));
+  }
+
+  /** 볼륨 슬라이더 하나(게임 화면 머리줄에서는 아이콘만) */
+  volumeControl(label = '🔊') {
     const input = el('input', { type: 'range', min: '0', max: '100', step: '1', 'data-volume': true, 'aria-label': '노래 볼륨', 'aria-keyshortcuts': 'ArrowUp ArrowDown' });
     const value = el('span', { class: 'volume-value', 'aria-hidden': 'true' });
     if (this.volume) bindVolumeInput(this.volume, input, value);
-    return el(
-      'div',
-      { class: 'volume-row' },
-      el('label', { class: 'volume-control', title: '게임 중 ↑↓ 키로도 조절' }, el('span', { class: 'volume-label', text: '볼륨' }), input, value),
-    );
+    return el('label', { class: 'volume-control', title: '게임 중 ↑↓ 키로도 조절' }, el('span', { class: 'volume-label', text: label, 'aria-hidden': 'true' }), input, value);
   }
 
   // ---------- 진입 ----------
@@ -483,24 +490,34 @@ export class OnlineApp {
     );
     return el(
       'section',
-      { id: 'screen-online-lobby', class: 'screen', 'data-screen': 'online-lobby', hidden: true },
-      el('h1', { text: '대기실' }),
+      { id: 'screen-online-lobby', class: 'screen screen-wide', 'data-screen': 'online-lobby', hidden: true },
+      el('div', { class: 'manage-header' }, el('h1', { text: '대기실' }), el('button', { type: 'button', class: 'btn small ghost', id: 'on-leave-lobby', text: '방 나가기', onclick: () => this.leave() })),
       el(
         'div',
-        { class: 'room-code-box' },
-        el('span', { class: 'sub', text: '방 코드' }),
-        el('strong', { id: 'on-room-code', class: 'room-code' }),
-        el('button', { type: 'button', class: 'btn small', id: 'on-copy', text: '초대 링크 복사', onclick: () => this.copyInvite() }),
+        { class: 'two-col' },
+        el(
+          'div',
+          { class: 'col-main' },
+          el(
+            'div',
+            { class: 'room-code-box' },
+            el('span', { class: 'sub', text: '방 코드' }),
+            el('strong', { id: 'on-room-code', class: 'room-code' }),
+            el('button', { type: 'button', class: 'btn small', id: 'on-copy', text: '🔗 초대 링크 복사', onclick: () => this.copyInvite() }),
+          ),
+          el('h2', {}, '설정 ', el('span', { id: 'on-settings-note', class: 'sub' })),
+          el('div', { class: 'settings', id: 'on-settings' }, ...groups, this.volumeRow()),
+          el('div', { class: 'actions' }, el('button', { type: 'button', class: 'btn primary big', id: 'on-start', text: '게임 시작', onclick: () => this.session?.start() })),
+          el('p', { class: 'status', id: 'on-lobby-hint' }),
+        ),
+        el(
+          'aside',
+          { class: 'col-side panel' },
+          el('h2', { class: 'panel-title' }, '참가자 ', el('span', { class: 'panel-meta', id: 'on-member-count' })),
+          el('ul', { id: 'on-members', class: 'member-list' }),
+          el('div', { class: 'chat-slot' }),
+        ),
       ),
-      el('h2', { text: '참가자' }),
-      el('ul', { id: 'on-members', class: 'member-list' }),
-      el('div', { class: 'chat-slot' }),
-      el('h2', {}, '설정 ', el('span', { id: 'on-settings-note', class: 'sub' })),
-      el('div', { class: 'settings', id: 'on-settings' }, ...groups),
-      this.volumeRow(),
-      el('div', { class: 'actions' }, el('button', { type: 'button', class: 'btn primary big', id: 'on-start', text: '게임 시작', onclick: () => this.session?.start() })),
-      el('p', { class: 'status', id: 'on-lobby-hint' }),
-      el('div', { class: 'actions' }, el('button', { type: 'button', class: 'btn ghost', id: 'on-leave-lobby', text: '방 나가기', onclick: () => this.leave() })),
     );
   }
 
@@ -569,6 +586,7 @@ export class OnlineApp {
       custom.value = SCORING.roundOptions.includes(room.settings.rounds) ? '' : room.settings.rounds;
     }
     const connected = room.players.filter((p) => p.connected && !p.left).length;
+    $('#on-member-count').textContent = `${connected} / ${SCORING.multi.maxPlayers}`;
     const enough = connected >= SCORING.multi.minPlayers;
     const start = $('#on-start');
     start.hidden = !isHost;
@@ -584,16 +602,36 @@ export class OnlineApp {
   buildGame() {
     return el(
       'section',
-      { id: 'screen-online-game', class: 'screen keep-alive', 'data-screen': 'online-game' },
+      { id: 'screen-online-game', class: 'screen screen-wide keep-alive', 'data-screen': 'online-game' },
       el(
         'div',
         { class: 'game-header' },
         el('span', { id: 'on-round-label', class: 'pill' }),
         el('span', { id: 'on-mode-label', class: 'pill muted' }),
+        this.volumeControl(),
         el('span', { id: 'on-score-label', class: 'score' }),
         el('button', { type: 'button', class: 'btn small ghost', id: 'on-quit', text: '나가기', onclick: () => this.leave({ ask: true }) }),
       ),
-      this.volumeRow(),
+      el('div', { class: 'game-layout' }, this.buildGameMain(), this.buildGameSide()),
+    );
+  }
+
+  /** 대결 게임 화면 오른쪽: 순위판과 채팅 */
+  buildGameSide() {
+    return el(
+      'aside',
+      { class: 'game-side panel' },
+      el('h2', { class: 'panel-title', text: '순위' }),
+      el('ol', { id: 'on-board', class: 'scoreboard' }),
+      el('div', { class: 'chat-slot' }),
+    );
+  }
+
+  /** 대결 게임 화면 왼쪽: 무대, 남은 시간, 답 입력, 정답 공개 */
+  buildGameMain() {
+    return el(
+      'div',
+      { class: 'game-main' },
       el(
         'div',
         { class: 'stage' },
@@ -612,7 +650,6 @@ export class OnlineApp {
       ),
       el('div', { class: 'progress', 'aria-label': '남은 시간' }, el('div', { class: 'progress-bar', id: 'on-progress-bar' })),
       el('p', { class: 'progress-label', id: 'on-progress-label' }),
-      el('ul', { id: 'on-board', class: 'scoreboard' }),
       // 매우 어려움: 내가 맞힌 항목. 정답 공개 중에도 보여 준다
       el('ul', { id: 'on-extreme-items', class: 'extreme-items', 'aria-label': '맞힌 항목', hidden: true }),
       el(
@@ -664,7 +701,6 @@ export class OnlineApp {
           }),
         ),
       ),
-      el('div', { class: 'chat-slot' }),
     );
   }
 
@@ -764,6 +800,7 @@ export class OnlineApp {
       $('#on-overlay').classList.remove('hidden');
       $('#on-eq').classList.remove('on');
       $('#on-overlay-text').textContent = '다음 라운드부터 함께해요';
+      $('#on-overlay-text').classList.remove('countdown');
       $('#on-overlay-hint').hidden = true;
       $('#on-progress-bar').style.width = '0%';
       $('#on-progress-label').textContent = '';
@@ -797,11 +834,15 @@ export class OnlineApp {
     const showVideo = this.playback.isPlayerVisible(this.playback.active);
     $('#on-overlay').classList.toggle('hidden', showVideo);
     $('#on-eq').classList.toggle('on', this.playback.stage === PLAYBACK_STAGE.PLAYING);
-    $('#on-overlay-text').textContent = this.overlayText();
+    const overlayText = this.overlayText();
+    $('#on-overlay-text').textContent = overlayText;
+    // 시작 신호 카운트다운(3, 2, 1, 시작!)은 크게
+    $('#on-overlay-text').classList.toggle('countdown', s.phase === 'starting' && /^(\d+|시작!)$/.test(overlayText));
 
-    // 남은 시간
+    // 남은 시간(5초 이하면 진행 바를 붉게)
     $('#on-progress-bar').style.width = `${Math.round(s.windowProgress() * 100)}%`;
     const left = s.secondsLeft();
+    $('#screen-online-game .progress').classList.toggle('low', !revealed && left != null && left <= 5);
     $('#on-progress-label').textContent = revealed || left == null ? '' : `남은 시간 ${Math.ceil(left)}초`;
 
     this.renderBoard(revealed);
@@ -940,9 +981,12 @@ export class OnlineApp {
   renderBoard(revealed) {
     const s = this.session;
     const room = s.room;
+    // 점수 높은 순(같으면 입장 순)
+    const players = room.players.filter((p) => !p.left);
+    const order = new Map(players.map((p, i) => [p.id, i]));
+    players.sort((a, b) => b.score - a.score || order.get(a.id) - order.get(b.id));
     $('#on-board').replaceChildren(
-      ...room.players
-        .filter((p) => !p.left)
+      ...players
         .map((p) => {
           // 매우 어려움: 아직 푸는 중인 사람은 맞힌 항목 개수만 보인다(어떤 항목인지는 숨김)
           const total = s.round?.items?.length;
@@ -966,21 +1010,29 @@ export class OnlineApp {
   buildResult() {
     return el(
       'section',
-      { id: 'screen-online-result', class: 'screen', 'data-screen': 'online-result', hidden: true },
+      { id: 'screen-online-result', class: 'screen screen-wide', 'data-screen': 'online-result', hidden: true },
       el('h1', { text: '최종 순위' }),
-      el('p', { class: 'status', id: 'on-result-note' }),
-      el('ol', { id: 'on-ranking', class: 'ranking' }),
-      el('div', { class: 'chat-slot' }),
-      el('h2', { text: '라운드별 기록' }),
-      el('p', { class: 'hint', text: '곡 제목을 누르면 YouTube에서 들었던 구간부터 다시 들을 수 있어요.' }),
-      el('ol', { id: 'on-history', class: 'result-list' }),
       el(
         'div',
-        { class: 'actions' },
-        el('button', { type: 'button', class: 'btn primary big', id: 'on-again', text: '같은 멤버로 한 판 더', onclick: () => this.session?.start() }),
-        el('button', { type: 'button', class: 'btn', id: 'on-leave-result', text: '방 나가기', onclick: () => this.leave() }),
+        { class: 'two-col' },
+        el(
+          'div',
+          { class: 'col-main' },
+          el('p', { class: 'status', id: 'on-result-note' }),
+          el('ol', { id: 'on-ranking', class: 'ranking' }),
+          el(
+            'div',
+            { class: 'actions' },
+            el('button', { type: 'button', class: 'btn primary big', id: 'on-again', text: '같은 멤버로 한 판 더', onclick: () => this.session?.start() }),
+            el('button', { type: 'button', class: 'btn', id: 'on-leave-result', text: '방 나가기', onclick: () => this.leave() }),
+          ),
+          el('p', { class: 'status', id: 'on-result-hint' }),
+          el('h2', { text: '라운드별 기록' }),
+          el('p', { class: 'hint', text: '곡 제목을 누르면 YouTube에서 들었던 구간부터 다시 들을 수 있어요.' }),
+          el('ol', { id: 'on-history', class: 'result-list' }),
+        ),
+        el('aside', { class: 'col-side panel' }, el('h2', { class: 'panel-title', text: '채팅' }), el('div', { class: 'chat-slot' })),
       ),
-      el('p', { class: 'status', id: 'on-result-hint' }),
     );
   }
 
@@ -992,16 +1044,17 @@ export class OnlineApp {
       ...(over?.ranking ?? []).map((r) =>
         el(
           'li',
-          { class: r.playerId === s.you ? 'me' : '' },
-          el('span', { class: 'rank', text: `${r.rank}위` }),
-          el('span', { class: 'name', text: r.nickname }),
+          { class: `${r.playerId === s.you ? 'me' : ''} rank-${r.rank}`.trim() },
+          el('span', { class: 'rank', text: ['🥇', '🥈', '🥉'][r.rank - 1] ?? `${r.rank}위`, 'aria-label': `${r.rank}위` }),
+          el('span', { class: 'name', text: r.nickname, style: `color: ${playerColor(r.playerId)}` }),
           r.left ? el('span', { class: 'chip', text: '나감' }) : '',
-          el('span', { class: 'pts', text: `${r.score}점 · 정답 ${r.correct}` }),
+          el('span', { class: 'rank-correct', text: `정답 ${r.correct}` }),
+          el('span', { class: 'pts', text: `${r.score}점` }),
         ),
       ),
     );
     $('#on-history').replaceChildren(
-      ...(over?.history ?? []).map((h) => {
+      ...(over?.history ?? []).map((h, index) => {
         const corrects = h.correctPlayers ?? [];
         const partials = h.partialPlayers ?? [];
         const mine = [...corrects, ...partials].find((c) => c.playerId === s.you);
@@ -1010,14 +1063,19 @@ export class OnlineApp {
           ...corrects.map((c) => `${c.nickname} (${Number(c.elapsed).toFixed(1)}초${c.hint ? ', 힌트' : ''})`),
           ...partials.map((c) => `${c.nickname} (${c.solved}/${total}${c.hint ? ', 힌트' : ''})`),
         ];
-        const mark = corrects.length ? '○ ' : partials.length ? '△ ' : '× ';
+        const state = corrects.length ? 'ok' : partials.length ? 'partial' : 'bad';
         return el(
           'li',
-          {},
+          { class: `res ${state}` },
+          el('span', { class: 'res-index', text: String(index + 1) }),
+          el('span', { class: 'res-mark', text: { ok: '○', partial: '△', bad: '×' }[state] }),
+          el(
+            'span',
+            { class: 'res-body' },
+            songLink(h.title, h.videoId, h.segmentStart),
+            el('span', { class: 'res-sub', text: names.length ? names.join(', ') : '정답자 없음' }),
+          ),
           el('span', { class: 'pts', text: mine ? `+${mine.points}점` : '' }),
-          el('span', { class: corrects.length || partials.length ? 'ok' : 'bad', text: mark }),
-          songLink(h.title, h.videoId, h.segmentStart),
-          ` — ${names.length ? names.join(', ') : '정답자 없음'}`,
         );
       }),
     );
