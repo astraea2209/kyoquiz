@@ -3168,5 +3168,15 @@
     "type": "ED",
     "duration": 254,
     "enabled": true
+  },
+  {
+    "id": "kanojo-op3",
+    "videoId": "XkOLZUTZRRI",
+    "title": "연애mm 필름",
+    "anime": { "name": "여친, 빌리겠습니다" },
+    "artist": "Halca",
+    "artistAliases": ["하루카"],
+    "type": "OP",
+    "enabled": true
   }
 ]
