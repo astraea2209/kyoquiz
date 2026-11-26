@@ -44,7 +44,7 @@ const STATUS_CLASS = {
 };
 const REASON_TEXT = {
   timeout: '시간 초과 — 아무도 맞히지 못했어요',
-  done: '모두 포기하거나 기회를 다 썼어요',
+  done: '모두 패스하거나 기회를 다 썼어요',
 };
 const GAME_OVER_NOTE = {
   'not-enough-players': '남은 인원이 부족해 게임을 마쳤습니다.',
@@ -590,6 +590,8 @@ export class OnlineApp {
           { class: 'overlay', id: 'on-overlay' },
           el('div', { class: 'eq', id: 'on-eq', 'aria-hidden': 'true' }, el('i'), el('i'), el('i'), el('i'), el('i')),
           el('p', { id: 'on-overlay-text', class: 'overlay-text' }),
+          // 초성 힌트(매우 어려움이 아닐 때): 정답 영상이 뜨는 무대 가운데에 크게
+          el('p', { class: 'overlay-hint', id: 'on-overlay-hint', 'aria-live': 'polite', hidden: true }, el('strong', { id: 'on-overlay-hint-text' }), el('span', { text: '제목 초성' })),
         ),
       ),
       el('div', { class: 'progress', 'aria-label': '남은 시간' }, el('div', { class: 'progress-bar', id: 'on-progress-bar' })),
@@ -600,8 +602,14 @@ export class OnlineApp {
       el(
         'div',
         { id: 'on-answer-area' },
+        // 힌트·패스 버튼은 개인전처럼 입력칸 위에
+        el(
+          'div',
+          { class: 'controls' },
+          el('button', { type: 'button', class: 'btn', id: 'on-hint', text: '초성 힌트 (-50%)', title: '곡 제목(매우 어려움은 가수·작품명도)의 초성을 나에게만 보여 줍니다. 이후 맞히면 점수가 절반', onclick: () => this.requestHint() }),
+          el('button', { type: 'button', class: 'btn ghost', id: 'on-pass', text: '패스 (K)', title: '단축키 K. 입력칸에 있을 때는 Esc를 누른 뒤 K', 'aria-keyshortcuts': 'K', onclick: () => this.session?.pass() }),
+        ),
         el('p', { class: 'attempts', id: 'on-attempts' }),
-        el('p', { class: 'initial-hint', id: 'on-hint-text', hidden: true }),
         el('div', { class: 'choices', id: 'on-choices' }),
         el(
           'form',
@@ -610,12 +618,6 @@ export class OnlineApp {
           el('button', { type: 'submit', class: 'btn primary', text: '제출' }),
         ),
         el('p', { class: 'feedback', id: 'on-feedback', role: 'status' }),
-        el(
-          'div',
-          { class: 'controls' },
-          el('button', { type: 'button', class: 'btn', id: 'on-hint', text: '초성 힌트 (-50%)', title: '곡 제목(매우 어려움은 가수·작품명도)의 초성을 나에게만 보여 줍니다. 이후 맞히면 점수가 절반', onclick: () => this.requestHint() }),
-          el('button', { type: 'button', class: 'btn ghost', id: 'on-pass', text: '패스 (K)', title: '단축키 K. 입력칸에 있을 때는 Esc를 누른 뒤 K', 'aria-keyshortcuts': 'K', onclick: () => this.session?.pass() }),
-        ),
       ),
       el(
         'div',
@@ -708,6 +710,7 @@ export class OnlineApp {
       $('#on-overlay').classList.remove('hidden');
       $('#on-eq').classList.remove('on');
       $('#on-overlay-text').textContent = '다음 라운드부터 함께해요';
+      $('#on-overlay-hint').hidden = true;
       $('#on-progress-bar').style.width = '0%';
       $('#on-progress-label').textContent = '';
       $('#on-answer-area').hidden = true;
@@ -773,8 +776,11 @@ export class OnlineApp {
     hintBtn.hidden = easy;
     hintBtn.disabled = !s.canHint;
     hintBtn.textContent = s.hint != null || s.hintRequested ? '힌트 사용함' : '초성 힌트 (-50%)';
-    $('#on-hint-text').hidden = s.hint == null;
-    $('#on-hint-text').textContent = formatHint(s.hint);
+    // 초성 힌트: 매우 어려움은 항목 칸의 ? 자리에, 그 밖에는 무대 가운데에 크게
+    const overlayHint = !round.items && s.hint && !revealed ? s.hint[0].text : null;
+    $('#on-overlay-hint').hidden = overlayHint == null;
+    $('#on-overlay-hint-text').textContent = overlayHint ?? '';
+    $('#on-overlay-hint').setAttribute('aria-label', formatHint(s.hint));
     // 답할 수 있게 되는 순간 입력칸에 자동 포커스(매 라운드 다시 클릭하지 않아도 되게)
     if (canAnswer && !this.answerWasReady && !easy) {
       const input = $('#on-answer-input');
@@ -841,11 +847,13 @@ export class OnlineApp {
       ...items.map((key) => {
         const solved = s.solved.has(key);
         const points = s.solved.get(key);
+        // 힌트를 봤으면 아직 못 맞힌 칸의 ? 자리에 초성
+        const hint = s.hint?.find((p) => p.key === key)?.text;
         return el(
           'li',
-          { class: solved ? 'solved' : revealed ? 'missed' : '' },
+          { class: solved ? 'solved' : revealed ? 'missed' : hint ? 'hinted' : '' },
           el('span', { class: 'item-label', text: ITEM_LABEL[key] }),
-          el('span', { class: 'item-value', text: solved || revealed ? value(key) : '?' }),
+          el('span', { class: 'item-value', text: solved || revealed ? value(key) : hint ?? '?' }),
           ...(solved && points != null ? [el('span', { class: 'item-points', text: `+${points}` })] : []),
         );
       }),

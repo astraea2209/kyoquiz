@@ -109,7 +109,9 @@
         <div class="player-slot" id="player-slot-1"><div id="player-1"></div></div>
         <div class="overlay" id="overlay">
           <div class="eq" id="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
-          <p id="overlay-text">재생 버튼을 눌러 주세요</p>
+          <p id="overlay-text" class="overlay-text">재생 버튼을 눌러 주세요</p>
+          <!-- 초성 힌트(매우 어려움이 아닐 때): 정답 영상이 뜨는 무대 가운데에 크게 -->
+          <p class="overlay-hint" id="overlay-hint" aria-live="polite" hidden><strong id="overlay-hint-text"></strong><span>제목 초성</span></p>
         </div>
       </div>
 
@@ -129,7 +131,6 @@
       <ul class="extreme-items" id="extreme-items" aria-label="맞힌 항목" hidden></ul>
       <div id="answer-area">
         <p class="attempts" id="attempts"></p>
-        <p class="initial-hint" id="hint-text" hidden></p>
         <div class="choices" id="choices"></div>
         <form id="answer-form" class="answer-form" autocomplete="off">
           <input

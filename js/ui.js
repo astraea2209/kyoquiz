@@ -317,12 +317,14 @@ export class App {
     list.replaceChildren(
       ...round.items.map((key) => {
         const solved = round.solved.get(key);
-        const state = solved ? 'solved' : revealed ? 'missed' : '';
+        // 힌트를 봤으면 아직 못 맞힌 칸의 ? 자리에 초성
+        const hint = round.hint?.find((p) => p.key === key)?.text;
+        const state = solved ? 'solved' : revealed ? 'missed' : hint ? 'hinted' : '';
         return el(
           'li',
           { class: state },
           el('span', { class: 'item-label', text: ITEM_LABEL[key] }),
-          el('span', { class: 'item-value', text: solved || revealed ? itemValue(round.song, key) : '?' }),
+          el('span', { class: 'item-value', text: solved || revealed ? itemValue(round.song, key) : hint ?? '?' }),
           ...(solved ? [el('span', { class: 'item-points', text: `+${solved.points}` })] : []),
         );
       }),
@@ -398,8 +400,11 @@ export class App {
     hintBtn.hidden = revealed || game.difficulty === DIFFICULTY.EASY;
     hintBtn.disabled = !game.canHint;
     hintBtn.textContent = round.hint ? '힌트 사용함' : '초성 힌트 (-50%)';
-    $('#hint-text').hidden = round.hint == null;
-    $('#hint-text').textContent = formatHint(round.hint);
+    // 초성 힌트: 매우 어려움은 항목 칸의 ? 자리에, 그 밖에는 무대 가운데에 크게
+    const overlayHint = !game.isExtreme && round.hint && !revealed ? round.hint[0].text : null;
+    $('#overlay-hint').hidden = overlayHint == null;
+    $('#overlay-hint-text').textContent = overlayHint ?? '';
+    $('#overlay-hint').setAttribute('aria-label', formatHint(round.hint));
 
     // 답 입력
     $('#answer-area').hidden = revealed;
@@ -492,7 +497,8 @@ export class App {
     const game = this.game;
     const mode = game.settings.mode;
     const played = game.history.length > 0;
-    const isRecord = played && game.finishReason === 'complete' && this.highScores.submit(mode, game.score);
+    // 0점은 기록으로 남기지 않는다(첫 게임을 0점으로 끝내도 '최고 기록 갱신!'이 뜨지 않게)
+    const isRecord = played && game.finishReason === 'complete' && game.score > 0 && this.highScores.submit(mode, game.score);
     const best = this.highScores.get(mode);
 
     $('#final-score').textContent = game.score;
