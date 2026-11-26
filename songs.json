@@ -3203,6 +3203,7 @@
     "artistAliases": [],
     "type": "삽입곡",
     "hookStart": 25,
+    "duration": 149,
     "enabled": true
   },
   {
@@ -3215,6 +3216,7 @@
     "artistAliases": [],
     "type": "OP",
     "hookStart": 10,
+    "duration": 186,
     "enabled": true
   },
   {
@@ -3226,6 +3228,7 @@
     "artist": "미나세 이노리",
     "artistAliases": ["스야히메"],
     "type": "OP",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3237,6 +3240,7 @@
     "artist": "NACHERRY",
     "artistAliases": ["나체리"],
     "type": "OP",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3248,6 +3252,7 @@
     "artist": "요정제국",
     "artistAliases": [],
     "type": "OP",
+    "duration": 91,
     "enabled": true
   },
   {
@@ -3260,6 +3265,7 @@
     "artistAliases": ["페이란"],
     "type": "ED",
     "hookStart": 0,
+    "duration": 89,
     "enabled": true
   },
   {
@@ -3271,6 +3277,7 @@
     "artist": "7!!",
     "artistAliases": ["세븐웁스"],
     "type": "ED",
+    "duration": 92,
     "enabled": true
   },
   {
@@ -3282,6 +3289,7 @@
     "artist": "페코린느, 콧코로, 캬루",
     "artistAliases": [],
     "type": "OP",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3293,6 +3301,7 @@
     "artist": "Akino and bless4",
     "artistAliases": ["아키노"],
     "type": "OP",
+    "duration": 92,
     "enabled": true
   },
   {
@@ -3304,6 +3313,7 @@
     "artist": "JAM Project",
     "artistAliases": ["잼 프로젝트"],
     "type": "OP",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3315,6 +3325,7 @@
     "artist": "스즈키 마사유키, 스즈키 아이리",
     "artistAliases": [],
     "type": "OP",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3326,6 +3337,7 @@
     "artist": "나카가와 쇼코",
     "artistAliases": [],
     "type": "OST",
+    "duration": 207,
     "enabled": true
   },
   {
@@ -3337,6 +3349,7 @@
     "artist": "서벌, 라쿤, 사막여우",
     "artistAliases": ["동물 비스킷츠"],
     "type": "OP",
+    "duration": 92,
     "enabled": true
   },
   {
@@ -3348,6 +3361,7 @@
     "artist": "사토시",
     "artistAliases": ["마츠모토 리카", "지우"],
     "type": "OP",
+    "duration": 88,
     "enabled": true
   },
   {
@@ -3359,6 +3373,7 @@
     "artist": "이시카와 치아키",
     "artistAliases": [],
     "type": "OP",
+    "duration": 89,
     "enabled": true
   },
   {
@@ -3370,6 +3385,7 @@
     "artist": "냐루코, 쿠우코, 쿠레이 타마오",
     "artistAliases": [],
     "type": "OP",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3382,6 +3398,7 @@
     "artistAliases": [],
     "type": "OP",
     "hookStart": 65,
+    "duration": 249,
     "enabled": true
   },
   {
@@ -3393,6 +3410,7 @@
     "artist": "KOTOKO",
     "artistAliases": ["코토코"],
     "type": "OP",
+    "duration": 84,
     "enabled": true
   },
   {
@@ -3404,6 +3422,7 @@
     "artist": "호리에 유이",
     "artistAliases": [],
     "type": "OP",
+    "duration": 91,
     "enabled": true
   },
   {
@@ -3415,6 +3434,7 @@
     "artist": "마법당",
     "artistAliases": [],
     "type": "OP",
+    "duration": 90,
     "enabled": true
   },
   {
@@ -3426,6 +3446,7 @@
     "artist": "미즈키 나나",
     "artistAliases": ["미즈키나나"],
     "type": "OP",
+    "duration": 95,
     "enabled": true
   },
   {
