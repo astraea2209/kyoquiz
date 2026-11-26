@@ -3,7 +3,7 @@ import { Room } from '../server/room.js';
 import { createFakeTimers } from './fakeTimers.js';
 import { makeSong, seededRng } from './helpers.js';
 
-export function createEnv({ songCount = 6, songs = null, config = {}, seed = 7, closed = [] } = {}) {
+export function createEnv({ songCount = 6, songs = null, config = {}, seed = 7, closed = [], stats = null } = {}) {
   const timers = createFakeTimers();
   const list = songs ?? Array.from({ length: songCount }, (_, i) => makeSong(i + 1, { duration: 200 }));
   const inbox = new Map(); // connId → message[]
@@ -20,6 +20,7 @@ export function createEnv({ songCount = 6, songs = null, config = {}, seed = 7, 
     timers,
     genToken: () => `token-${++tokenSeq}`,
     onClose: (r) => closed.push(r.code),
+    stats,
     config,
   });
 

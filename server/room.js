@@ -22,6 +22,7 @@ import { DIFFICULTY, buildChoices, canUseMultipleChoice, hintParts, itemCandidat
 import { MODE } from '../js/game.js';
 import { SCORING, answerWindow, applyHint, isValidRounds, scoreExtremeBonus, scoreExtremeItem, scoreMulti } from '../js/scoring.js';
 import { pickSegmentStart } from '../js/segment.js';
+import { addSongStats, roundSongStats } from '../js/songStats.js';
 
 export const ROOM_PHASE = Object.freeze({
   LOBBY: 'lobby',
@@ -114,6 +115,8 @@ export class Room {
    * @param {{setTimeout, clearTimeout}} [opts.timers]
    * @param {() => string} [opts.genToken]  재접속 토큰 생성기
    * @param {(room: Room) => void} [opts.onClose]  모든 플레이어가 나가 방을 지워도 될 때
+   * @param {{get: (videoId: string) => Promise<object|null>, add: (videoId: string, delta: object) => unknown}} [opts.stats]
+   *        곡별 정답률 저장소(매우 어려움만). 라운드 준비 때 get으로 지금까지 기록을 읽고, 공개 때 add로 이번 라운드를 더한다
    * @param {object} [opts.config]    ROOM_CONFIG 덮어쓰기
    */
   constructor({
@@ -125,6 +128,7 @@ export class Room {
     timers = defaultTimers,
     genToken = defaultToken,
     onClose = null,
+    stats = null,
     config = {},
   }) {
     this.code = code;
@@ -135,6 +139,7 @@ export class Room {
     this.timers = timers;
     this.genToken = genToken;
     this.onClose = onClose;
+    this.stats = stats;
     this.config = { ...ROOM_CONFIG, ...config };
 
     this.phase = ROOM_PHASE.LOBBY;
@@ -606,8 +611,10 @@ export class Room {
       correctCount: 0,
       // 매우 어려움: 맞혀야 할 항목 키(값은 공개 전까지 보내지 않는다)
       items: this.difficulty === DIFFICULTY.EXTREME ? Object.keys(itemCandidates(song)) : null,
+      priorStats: null, // 매우 어려움: 이 곡의 지금까지 정답률 기록(저장소에서 읽히면 채운다)
     };
     this.phase = ROOM_PHASE.PREPARING;
+    if (this.round.items) this.loadSongStats(this.round);
 
     const prepare = {
       type: 'prepare',
@@ -634,6 +641,34 @@ export class Room {
     }
     this.setTimer('ready', this.config.readyTimeoutMs, () => this.onReadyTimeout());
     this.evaluatePrep();
+  }
+
+  /** 곡의 지금까지 기록을 읽어 둔다. 공개 전에 못 읽으면 공개 화면에 정답률을 싣지 않는다(게임은 그대로 진행) */
+  loadSongStats(round) {
+    if (!this.stats) return;
+    Promise.resolve()
+      .then(() => this.stats.get(round.song.videoId))
+      .then((stats) => {
+        round.priorStats = stats ?? { players: 0 };
+      })
+      .catch(() => {});
+  }
+
+  /** 공개 때: 이번 라운드를 더한 누적 기록(공개 화면용)을 돌려주고 저장소에도 더한다 */
+  recordSongStats(round) {
+    if (!this.stats || !round.items) return null;
+    const counted = [PLAYER_STATUS.READY, PLAYER_STATUS.PASSED, PLAYER_STATUS.EXHAUSTED, PLAYER_STATUS.CORRECT];
+    // 답할 수 있었던 사람(도중에 끊겨도 맞힌 항목이 있으면 센다)
+    const participants = [...round.players.values()]
+      .filter((e) => counted.includes(e.status) || e.solved.size > 0)
+      .map((e) => ({ solved: e.solved.keys(), hint: e.hintUsed }));
+    const delta = roundSongStats(round.items, participants);
+    if (delta.players > 0) {
+      Promise.resolve()
+        .then(() => this.stats.add(round.song.videoId, delta))
+        .catch(() => {});
+    }
+    return round.priorStats ? addSongStats(round.priorStats, delta) : null;
   }
 
   /** 라운드당 오답 기회(매우 어려움은 항목이 많아 더 준다) */
@@ -946,12 +981,14 @@ export class Room {
     };
     this.history.push(record);
     this.phase = ROOM_PHASE.REVEALED;
+    const stats = this.recordSongStats(round);
 
     const willContinue = this.hasNext && this.connectedMembers.length >= this.config.minPlayers;
     this.broadcast({
       type: 'reveal',
       roundId: round.id,
       ...record,
+      ...(stats ? { stats } : {}),
       song: { videoId: song.videoId, title: song.title, anime: song.anime?.name ?? null, artist: song.artist ?? null, type: song.type ?? null },
       scores: this.members.map((p) => ({ playerId: p.id, score: p.score })),
       nextVideoId: willContinue ? this.queue[0].videoId : null,

@@ -12,6 +12,7 @@ import { CHAT_LIMITS, OnlineSession, playerColor } from './session.js';
 import { handleGameKey } from '../hotkeys.js';
 import { youtubeWatchUrl } from '../linkParser.js';
 import { bindVolumeInput } from '../volume.js';
+import { formatStatsSummary, itemRate } from '../songStats.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -625,6 +626,7 @@ export class OnlineApp {
         el('p', { class: 'reveal-result', id: 'on-reveal-result' }),
         el('h2', { id: 'on-reveal-title' }),
         el('p', { id: 'on-reveal-anime' }),
+        el('p', { class: 'sub', id: 'on-reveal-stats' }),
         el('p', { class: 'sub', id: 'on-reveal-excluded' }),
         el('p', { class: 'sub', id: 'on-reveal-next' }),
       ),
@@ -826,6 +828,10 @@ export class OnlineApp {
         ...(r.song.artist ? [el('span', { class: 'reveal-artist', text: ` / ${r.song.artist}` })] : []),
       );
       $('#on-reveal-anime').textContent = [r.song.anime, r.song.type].filter(Boolean).join(' · ');
+      // 매우 어려움: 이 곡을 지금까지 푼 사람들의 정답률(항목별 정답률은 항목 칸에)
+      const statsText = r.items ? formatStatsSummary(r.stats) : '';
+      $('#on-reveal-stats').textContent = statsText;
+      $('#on-reveal-stats').hidden = !statsText;
       const names = new Map(room.players.map((p) => [p.id, p.nickname]));
       $('#on-reveal-excluded').textContent = r.excluded?.length
         ? `제외된 사람: ${r.excluded.map((e) => `${names.get(e.playerId) ?? '?'}(${STATUS_CHIP[e.reason] ?? e.reason})`).join(', ')}`
@@ -843,6 +849,7 @@ export class OnlineApp {
     if (!items) return;
     const song = revealed ? s.reveal.song : null;
     const value = (key) => (song ? { title: song.title, artist: song.artist, anime: song.anime }[key] ?? '' : '맞혔어요');
+    const stats = revealed ? s.reveal.stats : null;
     list.replaceChildren(
       ...items.map((key) => {
         const solved = s.solved.has(key);
@@ -855,6 +862,9 @@ export class OnlineApp {
           el('span', { class: 'item-label', text: ITEM_LABEL[key] }),
           el('span', { class: 'item-value', text: solved || revealed ? value(key) : hint ?? '?' }),
           ...(solved && points != null ? [el('span', { class: 'item-points', text: `+${points}` })] : []),
+          ...(itemRate(stats, key) != null
+            ? [el('span', { class: 'item-rate', title: `지금까지 ${stats.players}명 중 ${stats.items[key]}명이 맞혔어요`, text: `정답률 ${itemRate(stats, key)}%` })]
+            : []),
         );
       }),
     );

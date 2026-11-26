@@ -11,7 +11,16 @@ ALLOWED_ORIGINS = "https://astraea2209.github.io,http://localhost:8000,http://12
 name = "ROOMS"
 class_name = "RoomDO"
 
+# 곡별 정답률(매우 어려움) 저장소. 서버 전체에 하나
+[[durable_objects.bindings]]
+name = "STATS"
+class_name = "StatsDO"
+
 # 무료 플랜은 SQLite 저장 방식(new_sqlite_classes)만 쓸 수 있다
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["RoomDO"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["StatsDO"]
