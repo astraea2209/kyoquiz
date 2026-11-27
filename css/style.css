@@ -767,10 +767,38 @@ textarea { min-height: 100px; margin: 8px 0; resize: vertical; }
 .chat-name { color: var(--accent); font-weight: 700; margin-right: 6px; }
 .chat-status { min-height: 1.2em; margin: 4px 0; font-size: 0.85rem; color: var(--warn); }
 .chat-form input { min-width: 0; }
+/* 채팅 이모지(그림): 보내기 버튼 옆 😀로 고르는 칸을 열고, 목록에는 그림으로 보인다 */
+.chat-form .sticker-toggle { flex: none; padding-left: 12px; padding-right: 12px; font-size: 1.15rem; line-height: 1; }
+.chat-form .sticker-toggle[aria-expanded="true"] { border-color: var(--accent); }
+.sticker-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding: 8px;
+  background: rgba(10, 12, 20, 0.45);
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+}
+.sticker-btn {
+  padding: 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  line-height: 0;
+}
+.sticker-btn:hover, .sticker-btn:focus-visible { border-color: var(--accent); background: rgba(255, 255, 255, 0.06); }
+.sticker-btn img { width: 56px; height: 56px; object-fit: contain; }
+.chat-sticker-line { display: flex; align-items: flex-start; }
+.chat-sticker { width: 72px; height: 72px; object-fit: contain; display: block; }
 /* 옆 패널 안에서는 채팅 목록이 남는 높이를 채운다 */
 .game-side .chat-slot, .col-side .chat-slot { display: flex; flex-direction: column; min-height: 0; flex: 1; }
 .game-side .chat-slot .chat, .col-side .chat-slot .chat { flex: 1; }
 .col-side .chat-log { height: 300px; }
+/* 옆 패널(300~360px)에서는 채팅 버튼(😀·보내기) 여백을 줄여 입력칸을 넓힌다 */
+.game-side .chat-form, .col-side .chat-form { gap: 6px; }
+.game-side .chat-form .btn, .col-side .chat-form .btn { padding: 0 10px; }
 /* 넓은 화면: 채팅이 있는 옆 패널(대기실·대결 게임·대결 결과)을 화면 아래 끝까지 늘린다.
    --side-top은 패널 위쪽 위치(화면 여백 + 제목·머리줄 높이) */
 @media (min-width: 1000px) {

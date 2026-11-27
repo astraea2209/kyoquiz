@@ -6,6 +6,7 @@
 // - ↑/↓: 노래 볼륨 ±VOLUME_KEY_STEP. 한 줄 입력칸(답·채팅)에서도 된다(입력 중에도 바로 조절하게).
 //   볼륨 슬라이더 자체에서는 브라우저 기본 동작(1씩)에 맡기고, 여러 줄 입력칸·선택 목록에서는 쓰지 않는다.
 // - 1~4: 쉬움(객관식)에서 보기 고르기. 글자 입력칸에서는 동작하지 않는다.
+// - Tab: 친구와 대결에서 답 입력칸 ↔ 채팅 입력칸 전환(옮길 곳이 없으면 브라우저 기본 Tab).
 
 // 글자를 입력하지 않는 input 종류. 여기서는 K를 단축키로 쓴다
 const NON_TEXT_INPUTS = new Set(['button', 'checkbox', 'color', 'file', 'image', 'radio', 'range', 'reset', 'submit']);
@@ -65,10 +66,16 @@ export function choiceKeyIndex(event) {
  * @param {() => boolean} [actions.next]  정답 공개 중이라 다음으로 넘어갈 수 있으면 넘기고 true
  * @param {(delta: number) => void} [actions.volume]  볼륨을 delta만큼 바꾼다
  * @param {(index: number) => boolean} [actions.choose]  객관식 보기 index를 고를 수 있으면 고르고 true
- * @returns {'pass'|'next'|'blur'|'volume'|'choose'|null}  처리한 동작(처리했으면 event.preventDefault()를 불렀다)
+ * @param {(target: EventTarget) => boolean} [actions.toggleInput]  Tab: target에서 다른 입력칸(답↔채팅)으로 옮길 수 있으면 옮기고 true
+ * @returns {'pass'|'next'|'blur'|'volume'|'choose'|'toggle'|null}  처리한 동작(처리했으면 event.preventDefault()를 불렀다)
  */
-export function handleGameKey(event, { pass, next = () => false, volume = null, choose = null }) {
+export function handleGameKey(event, { pass, next = () => false, volume = null, choose = null, toggleInput = null }) {
   const target = event.target;
+  // Tab(Shift+Tab 포함): 답 입력칸 ↔ 채팅 입력칸. 바꿀 수 없으면 브라우저 기본 Tab 이동
+  if (toggleInput && event.key === 'Tab' && !hasModifier(event) && toggleInput(target)) {
+    event.preventDefault();
+    return 'toggle';
+  }
   if (event.key === 'Escape' && isTypingTarget(target) && !event.isComposing) {
     target.blur?.();
     event.preventDefault();
