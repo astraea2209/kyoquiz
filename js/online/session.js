@@ -4,6 +4,7 @@
 
 import { SCORING } from '../scoring.js';
 import { REACTION_COOLDOWN_MS, isReaction } from './reactions.js';
+import { isSticker } from './stickers.js';
 
 // 플레이어 색(채팅 이름·참가자·순위판). 방 안 입장 순서(p1, p2, …)로 정해 최대 인원 8명이 모두 다르다
 export const PLAYER_COLORS = Object.freeze(['#6c8cff', '#3ecf8e', '#ffb84d', '#ff7eb6', '#4dd0e1', '#b892ff', '#ff8a65', '#c6e05a']);
@@ -49,7 +50,7 @@ export class OnlineSession {
     this.hintRequested = false;
     this.feedbackAt = 0;
     this.kicked = false;
-    this.chat = []; // 받은 채팅 {id, playerId, nickname, text, at} (최근 CHAT_LIMITS.keep개)
+    this.chat = []; // 받은 채팅 {id, playerId, nickname, text, sticker(이모지 id 또는 null), at} (최근 CHAT_LIMITS.keep개)
     this.chatVersion = 0; // 채팅 목록이 바뀔 때마다 1씩 늘어난다(화면이 다시 그릴지 판단)
     this.chatBlocked = null; // 방금 막힌 내 채팅 {reason: 'answer'|'rate', at}
     this.lastChatSentAt = null;
@@ -187,8 +188,10 @@ export class OnlineSession {
     let added = false;
     for (const m of list) {
       if (!m || typeof m.text !== 'string' || seen.has(m.id)) continue;
+      const sticker = isSticker(m.sticker) ? m.sticker : null;
+      if (!m.text && !sticker) continue; // 모르는 이모지(새 버전 서버) 등 그릴 게 없는 채팅
       seen.add(m.id);
-      this.chat.push({ id: m.id, playerId: m.playerId, nickname: m.nickname, text: m.text, at: m.at });
+      this.chat.push({ id: m.id, playerId: m.playerId, nickname: m.nickname, text: m.text, sticker, at: m.at });
       added = true;
     }
     if (!added) return;
@@ -340,9 +343,22 @@ export class OnlineSession {
   sendChat(text) {
     const value = Array.from(String(text ?? '').replace(/\s+/g, ' ').trim()).slice(0, CHAT_LIMITS.maxLength).join('');
     if (!value) return 'empty';
+    return this.sendChatMessage({ type: 'chat', text: value });
+  }
+
+  /**
+   * 채팅 이모지 보내기(STICKERS의 id). 채팅과 같은 간격 제한을 쓴다.
+   * @returns {'sent'|'invalid'|'rate'|false}
+   */
+  sendSticker(id) {
+    if (!isSticker(id)) return 'invalid';
+    return this.sendChatMessage({ type: 'chat', sticker: id });
+  }
+
+  sendChatMessage(message) {
     const now = this.clock.serverNow();
     if (this.lastChatSentAt != null && now - this.lastChatSentAt < CHAT_LIMITS.cooldownMs) return 'rate';
-    if (!this.send({ type: 'chat', text: value })) return false;
+    if (!this.send(message)) return false;
     this.lastChatSentAt = now;
     this.chatBlocked = null;
     return 'sent';

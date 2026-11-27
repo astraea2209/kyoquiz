@@ -9,6 +9,7 @@ import { buildInviteLink, resolveServerUrl, roomsUrl, webSocketUrl } from './con
 import { ClockSync } from './net.js';
 import { OnlinePlayback, PLAYBACK_STAGE } from './playback.js';
 import { REACTIONS } from './reactions.js';
+import { STICKERS, stickerById } from './stickers.js';
 import { CHAT_LIMITS, OnlineSession, playerColor } from './session.js';
 import { handleGameKey } from '../hotkeys.js';
 import { youtubeWatchUrl } from '../linkParser.js';
@@ -405,18 +406,59 @@ export class OnlineApp {
         $('#on-chat-status').textContent = '';
       },
     });
+    const picker = el(
+      'div',
+      { id: 'on-sticker-picker', class: 'sticker-picker', role: 'group', 'aria-label': '이모지', hidden: true },
+      ...STICKERS.map((sticker) =>
+        el(
+          'button',
+          { type: 'button', class: 'sticker-btn', title: sticker.label, 'aria-label': `${sticker.label} 이모지 보내기`, onclick: () => this.sendSticker(sticker.id) },
+          el('img', { src: sticker.src, alt: '', width: '56', height: '56', loading: 'lazy' }),
+        ),
+      ),
+    );
+    const toggle = el('button', {
+      type: 'button',
+      id: 'on-sticker-toggle',
+      class: 'btn sticker-toggle',
+      text: '😀',
+      title: '이모지',
+      'aria-label': '이모지 열기',
+      'aria-expanded': 'false',
+      'aria-controls': 'on-sticker-picker',
+      onclick: () => this.toggleStickerPicker(),
+    });
     return el(
       'div',
       { class: 'chat', id: 'on-chat' },
       el('ul', { id: 'on-chat-log', class: 'chat-log', 'aria-label': '채팅', 'aria-live': 'polite', 'data-empty': '아직 채팅이 없어요' }),
       el('p', { id: 'on-chat-status', class: 'chat-status', role: 'status' }),
+      picker,
       el(
         'form',
         { id: 'on-chat-form', class: 'answer-form chat-form', autocomplete: 'off', onsubmit: (event) => this.submitChat(event) },
         input,
+        toggle,
         el('button', { type: 'submit', class: 'btn', text: '보내기' }),
       ),
     );
+  }
+
+  toggleStickerPicker(open) {
+    const picker = $('#on-sticker-picker');
+    const show = open ?? picker.hidden;
+    picker.hidden = !show;
+    $('#on-sticker-toggle').setAttribute('aria-expanded', String(show));
+  }
+
+  sendSticker(id) {
+    const result = this.session?.sendSticker(id);
+    if (result === 'sent') {
+      $('#on-chat-status').textContent = '';
+      this.toggleStickerPicker(false);
+    } else if (result === 'rate') {
+      $('#on-chat-status').textContent = CHAT_BLOCKED_TEXT.rate;
+    }
   }
 
   submitChat(event) {
@@ -444,14 +486,17 @@ export class OnlineApp {
       const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
       const lastMine = s.chat.at(-1)?.playerId === s.you;
       log.replaceChildren(
-        ...s.chat.map((m) =>
-          el(
+        ...s.chat.map((m) => {
+          const sticker = m.sticker ? stickerById(m.sticker) : null;
+          return el(
             'li',
-            { class: m.playerId === s.you ? 'me' : '' },
+            { class: [m.playerId === s.you ? 'me' : '', sticker ? 'chat-sticker-line' : ''].filter(Boolean).join(' ') },
             el('span', { class: 'chat-name', text: m.nickname, style: `color: ${playerColor(m.playerId)}` }),
-            el('span', { class: 'chat-text', text: m.text }),
-          ),
-        ),
+            sticker
+              ? el('img', { class: 'chat-sticker', src: sticker.src, alt: `(${sticker.label} 이모지)`, title: sticker.label, width: '72', height: '72' })
+              : el('span', { class: 'chat-text', text: m.text }),
+          );
+        }),
       );
       if (atBottom || lastMine) log.scrollTop = log.scrollHeight;
     }

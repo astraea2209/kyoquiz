@@ -18,6 +18,7 @@
 // 곡 교체: 준비 단계에서 과반이 재생하지 못하면 곡을 바꾸되, 한 라운드에서 maxSongReplacements번을 넘으면 게임을 멈춘다.
 // 초성 힌트: 쉬움 제외, 답할 수 있는 사람이 라운드당 1번 요청하면 본인에게만 초성을 보낸다(매우 어려움은 가수·작품명도). 이후 얻는 점수는 SCORING.hint만큼 깎인다.
 // 채팅: 대기실·게임·결과 어디서나. 라운드 중(공개 전)에는 정답이 들어간 채팅을 막는다(chatBlocked {reason: 'answer'}).
+// 채팅 이모지: chat {sticker}(STICKERS의 id)는 글 대신 그림. 정답 검사 없이 채팅과 같은 간격 제한만 받는다.
 // 라운드 메시지(ready, answer, pass, playerError)는 roundId가 현재 라운드와 다르면 조용히 무시한다.
 // 공개(reveal) 전에는 곡 제목·별칭·정답 위치를 어떤 메시지에도 싣지 않는다.
 
@@ -26,6 +27,7 @@ import { MODE } from '../js/game.js';
 import { SCORING, answerWindow, applyHint, isValidRounds, scoreExtremeBonus, scoreExtremeItem, scoreMulti } from '../js/scoring.js';
 import { pickSegmentStart } from '../js/segment.js';
 import { REACTION_COOLDOWN_MS, isReaction } from '../js/online/reactions.js';
+import { isSticker } from '../js/online/stickers.js';
 import { addSongStats, roundSongStats } from '../js/songStats.js';
 
 export const ROOM_PHASE = Object.freeze({
@@ -481,9 +483,12 @@ export class Room {
 
   // ---------- 채팅 ----------
   onChat(player, message) {
+    // 이모지(STICKERS의 id)를 보내면 글 대신 그림 하나. 글은 무시한다
+    const sticker = message.sticker != null ? String(message.sticker) : null;
+    if (sticker != null && !isSticker(sticker)) return;
     // 줄바꿈·탭은 지우지 않고 띄어쓰기로 바꾼다(닉네임은 제어 문자로 보고 지운다)
-    const text = this.cleanText(String(message.text ?? '').replace(/\s+/g, ' '), this.config.maxChatLength);
-    if (!text) return;
+    const text = sticker ? '' : this.cleanText(String(message.text ?? '').replace(/\s+/g, ' '), this.config.maxChatLength);
+    if (!text && !sticker) return;
     const now = this.now();
     if (player.lastChatAt != null && now - player.lastChatAt < this.config.chatCooldownMs) {
       this.sendToPlayer(player, { type: 'chatBlocked', reason: 'rate' });
@@ -491,12 +496,13 @@ export class Room {
     }
     // 공개 전에는 정답(제목·가수·작품명과 별칭)이 들어간 채팅을 막는다. 보낸 사람에게만 알린다
     const hidden = [ROOM_PHASE.PREPARING, ROOM_PHASE.STARTING, ROOM_PHASE.ANSWERING].includes(this.phase);
-    if (hidden && this.round && revealsAnswer(text, this.round.song)) {
+    if (text && hidden && this.round && revealsAnswer(text, this.round.song)) {
       this.sendToPlayer(player, { type: 'chatBlocked', reason: 'answer' });
       return;
     }
     player.lastChatAt = now;
     const entry = { id: ++this.chatSeq, playerId: player.id, nickname: player.nickname, text, at: now };
+    if (sticker) entry.sticker = sticker;
     this.chatLog.push(entry);
     if (this.chatLog.length > this.config.chatLogSize) this.chatLog.shift();
     this.broadcast({ type: 'chat', ...entry });
