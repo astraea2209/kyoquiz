@@ -151,3 +151,34 @@ test('handleGameKey: 숫자키로 객관식 보기 고르기(입력칸 안에서
   assert.equal(handleGameKey(keyEvent({ key: '1', code: 'Digit1' }), { pass: () => true }), null);
   assert.deepEqual(chosen, [1]);
 });
+
+test('handleGameKey: Tab(Shift+Tab 포함)으로 답 입력칸 ↔ 채팅 입력칸 전환', () => {
+  const answer = input();
+  const chat = input();
+  const moved = [];
+  const toggleInput = (target) => {
+    if (target === answer) return moved.push('chat') > 0;
+    if (target === chat) return moved.push('answer') > 0;
+    return false;
+  };
+  const pass = () => false;
+  const tab = keyEvent({ key: 'Tab', code: 'Tab', target: answer });
+  assert.equal(handleGameKey(tab, { pass, toggleInput }), 'toggle');
+  assert.equal(tab.prevented, true, '브라우저 기본 Tab 이동을 막는다');
+  const back = keyEvent({ key: 'Tab', code: 'Tab', shiftKey: true, target: chat });
+  assert.equal(handleGameKey(back, { pass, toggleInput }), 'toggle');
+  assert.deepEqual(moved, ['chat', 'answer']);
+});
+
+test('handleGameKey: 옮길 곳이 없거나 Ctrl+Tab이면 기본 Tab 동작', () => {
+  const pass = () => false;
+  const none = keyEvent({ key: 'Tab', code: 'Tab', target: input() });
+  assert.equal(handleGameKey(none, { pass, toggleInput: () => false }), null);
+  assert.equal(none.prevented, false);
+  let called = 0;
+  const ctrl = keyEvent({ key: 'Tab', code: 'Tab', ctrlKey: true, target: input() });
+  assert.equal(handleGameKey(ctrl, { pass, toggleInput: () => ++called > 0 }), null);
+  assert.equal(called, 0, '탭 전환(Ctrl+Tab)은 브라우저에 맡긴다');
+  const noHandler = keyEvent({ key: 'Tab', code: 'Tab', target: input() });
+  assert.equal(handleGameKey(noHandler, { pass }), null, '개인전(toggleInput 없음)은 그대로');
+});
