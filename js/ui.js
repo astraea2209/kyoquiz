@@ -88,10 +88,11 @@ function historyItem(h, index) {
 }
 
 export class App {
-  constructor({ store, durationCache, highScores, storage, volume = null }) {
+  constructor({ store, durationCache, highScores, storage, volume = null, recentSongs = null }) {
     this.volume = volume; // 노래 볼륨(↑↓ 단축키)
     this.store = store;
     this.durationCache = durationCache;
+    this.recentSongs = recentSongs; // 최근에 나온 곡(새 게임에서 뒤로 미룸)
     this.highScores = highScores;
     this.storage = storage;
     this.players = [];
@@ -242,6 +243,7 @@ export class App {
       settings,
       players: this.players,
       durationCache: this.durationCache,
+      recentSongs: this.recentSongs,
     });
     this.game = game;
     game.on('change', () => this.renderGame());

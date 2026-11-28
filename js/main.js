@@ -10,6 +10,7 @@ import {
 } from './songs.js';
 import { roomCodeFromSearch } from './online/config.js';
 import { OnlineApp } from './online/ui.js';
+import { RecentSongs } from './recentSongs.js';
 import { App } from './ui.js';
 import { VolumeControl, bindVolumeInput } from './volume.js';
 
@@ -36,6 +37,7 @@ const app = new App({
   storage,
   durationCache: new DurationCache(storage),
   highScores: new HighScores(storage),
+  recentSongs: new RecentSongs(storage),
   volume,
 });
 app.init();

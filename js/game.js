@@ -6,7 +6,8 @@
 //   onStateChange(cb(state)) → 구독 해제 함수,  onError(cb(code)) → 구독 해제 함수
 // state 값은 PLAYER_STATE 참고.
 
-import { DIFFICULTY, buildChoices, canUseMultipleChoice, hintParts, itemCandidates, judgeAnswer, judgeItems, shuffle } from './judge.js';
+import { DIFFICULTY, buildChoices, canUseMultipleChoice, hintParts, itemCandidates, judgeAnswer, judgeItems } from './judge.js';
+import { orderByRecency } from './recentSongs.js';
 import { SCORING, applyHint, scoreExtremeBonus, scoreExtremeItem, scoreFull, scoreRandom } from './scoring.js';
 import { pickSegmentStart } from './segment.js';
 
@@ -49,6 +50,7 @@ export class GameSession {
    *   answerTime: 랜덤듣기에서 구간이 끝난 뒤 답할 수 있는 초(0이면 제한 없음)
    * @param {object[]} opts.players     플레이어 1~2개. 2개면 번갈아 쓰며 다음 곡을 미리 cue한다.
    * @param {object} [opts.durationCache] {get(videoId), set(videoId, seconds)}
+   * @param {object} [opts.recentSongs] {list(): videoId[], add(videoId)} 최근 곡을 출제 순서 뒤로 미루고, 공개한 곡을 기록
    * @param {Function} [opts.rng]
    * @param {Function} [opts.now]       ms 단위 시계
    * @param {object} [opts.scheduler]   {setInterval, clearInterval}
@@ -58,6 +60,7 @@ export class GameSession {
     settings,
     players,
     durationCache = null,
+    recentSongs = null,
     rng = Math.random,
     now = () => Date.now(),
     scheduler = defaultScheduler,
@@ -76,6 +79,7 @@ export class GameSession {
     };
     this.players = players;
     this.durationCache = durationCache;
+    this.recentSongs = recentSongs;
     this.rng = rng;
     this.now = now;
     this.scheduler = scheduler;
@@ -153,7 +157,7 @@ export class GameSession {
       this.difficulty = DIFFICULTY.NORMAL;
       this.toast('객관식 보기를 만들 곡이 부족해 보통 난이도(주관식)로 진행합니다.');
     }
-    this.queue = shuffle(playable, this.rng);
+    this.queue = orderByRecency(playable, this.recentSongs?.list() ?? [], this.rng);
     this.totalRounds = Math.min(this.settings.rounds, this.queue.length);
     if (this.totalRounds < this.settings.rounds) {
       this.toast(`사용 가능한 곡이 ${this.queue.length}개라서 ${this.totalRounds}라운드로 진행합니다.`);
@@ -420,6 +424,7 @@ export class GameSession {
       round.result.bonus = round.bonus;
     }
     this.history.push({ song: round.song, segmentStart: round.segmentStart, ...round.result });
+    this.recentSongs?.add(round.song.videoId);
     const wasPlaying = this.phase !== PHASE.READY;
     this.phase = PHASE.REVEALED;
 

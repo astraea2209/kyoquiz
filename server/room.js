@@ -22,7 +22,8 @@
 // 라운드 메시지(ready, answer, pass, playerError)는 roundId가 현재 라운드와 다르면 조용히 무시한다.
 // 공개(reveal) 전에는 곡 제목·별칭·정답 위치를 어떤 메시지에도 싣지 않는다.
 
-import { DIFFICULTY, buildChoices, canUseMultipleChoice, hintParts, itemCandidates, judgeAnswer, judgeItems, revealsAnswer, shuffle } from '../js/judge.js';
+import { DIFFICULTY, buildChoices, canUseMultipleChoice, hintParts, itemCandidates, judgeAnswer, judgeItems, revealsAnswer } from '../js/judge.js';
+import { RECENT_SONGS_LIMIT, addRecent, orderByRecency } from '../js/recentSongs.js';
 import { MODE } from '../js/game.js';
 import { SCORING, answerWindow, applyHint, isValidRounds, scoreExtremeBonus, scoreExtremeItem, scoreMulti } from '../js/scoring.js';
 import { pickSegmentStart } from '../js/segment.js';
@@ -65,6 +66,7 @@ export const ROOM_CONFIG = Object.freeze({
   maxChatLength: 100,
   chatCooldownMs: 500, // 한 사람이 채팅을 보내는 최소 간격
   chatLogSize: 50, // 새로 들어오거나 재접속한 사람에게 보내 주는 최근 채팅 수
+  recentSongsLimit: RECENT_SONGS_LIMIT, // 방에서 최근에 나온 곡을 기억하는 수(한 판 더 할 때 뒤로 미룸)
   reactionCooldownMs: REACTION_COOLDOWN_MS,
 });
 
@@ -162,6 +164,7 @@ export class Room {
     this.graceTimers = new Map(); // playerId → timer id
     this.chatLog = []; // 최근 채팅(방이 살아 있는 동안 유지)
     this.chatSeq = 0;
+    this.recentVideoIds = []; // 이 방에서 공개한 곡(앞이 오래전). 한 판 더 해도 유지
     this.closed = false;
     this.resetGame();
   }
@@ -585,7 +588,7 @@ export class Room {
       this.difficulty = DIFFICULTY.NORMAL;
       notices.push('객관식 보기를 만들 곡이 부족해 보통 난이도(주관식)로 진행합니다.');
     }
-    this.queue = shuffle(playable, this.rng);
+    this.queue = orderByRecency(playable, this.recentVideoIds, this.rng);
     this.totalRounds = Math.min(this.settings.rounds, this.queue.length);
     if (this.totalRounds < this.settings.rounds) {
       notices.push(`사용 가능한 곡이 ${this.queue.length}개라서 ${this.totalRounds}라운드로 진행합니다.`);
@@ -1024,6 +1027,7 @@ export class Room {
       ...(round.items ? { items: round.items, partialPlayers } : {}),
     };
     this.history.push(record);
+    this.recentVideoIds = addRecent(this.recentVideoIds, song.videoId, this.config.recentSongsLimit);
     this.phase = ROOM_PHASE.REVEALED;
     round.revealEndsAt = this.now() + this.revealMs;
     const stats = this.recordSongStats(round);
